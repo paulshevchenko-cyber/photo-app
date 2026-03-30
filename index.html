@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="theme-color" content="#0E0E12" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<title>Фото на документы РФ</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; background: #0E0E12; }
+  body { overflow: hidden; -webkit-tap-highlight-color: transparent; font-family: 'Courier New', monospace; }
+  button { cursor: pointer; font-family: 'Courier New', monospace; }
+  button:active { opacity: 0.7; transform: scale(0.97); }
+
+  .root {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #0E0E12;
+    color: #E8D5A3;
+    max-width: 480px;
+    margin: 0 auto;
+    user-select: none;
+  }
+
+  /* Header */
+  .header {
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid rgba(232,213,163,0.1);
+    background: rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+  .header-title {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 10px; letter-spacing: 0.16em; color: #E8D5A3;
+    margin-bottom: 8px; font-weight: bold;
+  }
+  .header-icon { color: #F5C842; font-size: 13px; }
+  .type-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+  .type-pill {
+    background: transparent;
+    border: 1px solid rgba(232,213,163,0.22);
+    border-radius: 3px;
+    color: rgba(232,213,163,0.5);
+    font-size: 10px;
+    padding: 4px 9px;
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
+  }
+  .type-pill.active {
+    background: rgba(245,200,66,0.13);
+    border-color: #F5C842;
+    color: #F5C842;
+  }
+  .type-desc {
+    font-size: 9px; color: rgba(232,213,163,0.35);
+    margin-top: 5px; letter-spacing: 0.07em;
+  }
+
+  /* Viewfinder */
+  .viewfinder {
+    flex: 1;
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .viewfinder video {
+    width: 100%; height: 100%;
+    object-fit: cover; display: block;
+  }
+  .mirror { transform: scaleX(-1); }
+  .svg-overlay {
+    position: absolute; inset: 0;
+    pointer-events: none;
+  }
+  .flash {
+    position: absolute; inset: 0;
+    background: white; opacity: 0.9;
+    pointer-events: none; z-index: 10;
+    animation: flashFade 0.25s forwards;
+  }
+  @keyframes flashFade { to { opacity: 0; } }
+  .hint {
+    position: absolute; bottom: 10px;
+    left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.62);
+    color: rgba(232,213,163,0.72);
+    font-size: 9px; padding: 5px 13px;
+    border-radius: 20px; white-space: nowrap;
+    letter-spacing: 0.06em;
+    border: 1px solid rgba(232,213,163,0.13);
+    pointer-events: none;
+  }
+  .cam-error {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 14px; color: #E8D5A3; font-size: 13px;
+    text-align: center; padding: 28px;
+    background: rgba(0,0,0,0.85);
+    white-space: pre-line; line-height: 1.6;
+  }
+  .cam-error span { font-size: 36px; }
+
+  /* Preview */
+  .preview-wrap {
+    width: 100%; height: 100%;
+    display: flex; align-items: center;
+    justify-content: center;
+    background: #111115; position: relative;
+  }
+  .preview-wrap img {
+    max-width: 100%; max-height: 100%;
+    object-fit: contain; display: block;
+  }
+  .preview-badge {
+    position: absolute; top: 12px; right: 12px;
+    background: rgba(0,0,0,0.72);
+    border: 1px solid #4ade80; border-radius: 4px;
+    padding: 4px 10px; font-size: 11px; color: #fff;
+    letter-spacing: 0.05em;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex; align-items: center;
+    justify-content: space-around;
+    padding: 14px 24px;
+    background: #0E0E12;
+    border-top: 1px solid rgba(232,213,163,0.08);
+    gap: 10px; flex-shrink: 0;
+  }
+  .capture-btn {
+    width: 66px; height: 66px; border-radius: 50%;
+    border: 3px solid #F5C842; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 0 18px rgba(245,200,66,0.18);
+    transition: box-shadow 0.15s;
+  }
+  .capture-btn:active { box-shadow: 0 0 30px rgba(245,200,66,0.45); }
+  .capture-inner {
+    width: 50px; height: 50px; border-radius: 50%;
+    background: #F5C842; pointer-events: none;
+  }
+  .flip-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    border: 1px solid rgba(232,213,163,0.22);
+    background: rgba(232,213,163,0.04);
+    color: #E8D5A3;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .spacer { width: 44px; height: 44px; flex-shrink: 0; }
+  .action-btn {
+    flex: 1; padding: 12px 0;
+    background: transparent;
+    border: 1px solid rgba(232,213,163,0.28);
+    color: #E8D5A3; border-radius: 4px;
+    font-size: 12px; letter-spacing: 0.1em;
+  }
+  .action-btn.primary {
+    background: rgba(245,200,66,0.13);
+    border-color: #F5C842; color: #F5C842;
+  }
+
+  /* Requirements */
+  .req-panel {
+    padding: 10px 14px 14px;
+    border-top: 1px solid rgba(232,213,163,0.07);
+    background: rgba(0,0,0,0.28); flex-shrink: 0;
+  }
+  .req-title {
+    font-size: 8px; letter-spacing: 0.2em;
+    color: rgba(232,213,163,0.3); margin-bottom: 7px;
+  }
+  .req-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px;
+  }
+  .req-item {
+    display: flex; justify-content: space-between;
+    font-size: 9px; padding: 3px 0;
+    border-bottom: 1px solid rgba(232,213,163,0.06);
+  }
+  .req-key { color: rgba(232,213,163,0.37); }
+  .req-val { color: rgba(232,213,163,0.72); text-align: right; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+const FACE = {
+  ovalCenterY:   0.47,
+  ovalHeightFrac:0.74,
+  ovalWidthFrac: 0.54,
+  eyeLineFrac:   0.55,
+  chinLineFrac:  0.85,
+  crownLineFrac: 0.11,
+};
+
+const TYPES = {
+  passport: { label:"Паспорт / Загран", size:"35×45 мм", aspect:35/45, desc:"Загранпаспорт, ВНЖ, СНИЛС, права" },
+  visa:     { label:"Виза",             size:"35×45 мм", aspect:35/45, desc:"Шенген, US, UK, Китай" },
+  zagran:   { label:"Воен. билет",      size:"30×40 мм", aspect:30/40, desc:"Военный билет, приписное" },
+};
+
+const REQS = [
+  ["Размер",    null],
+  ["Лицо",      "70–80% высоты"],
+  ["Фон",       "белый / светло-серый"],
+  ["Взгляд",    "прямо в объектив"],
+  ["Выражение", "нейтральное"],
+  ["Качество",  "без теней, резкое"],
+];
+
+function FlipIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 7h-9"/><path d="M14 17H5"/>
+      <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
+    </svg>
+  );
+}
+
+function Overlay({ w, h, type }) {
+  if (!w || !h) return null;
+  const { aspect, size } = TYPES[type];
+
+  let fH = h * 0.83, fW = fH * aspect;
+  if (fW > w * 0.78) { fW = w * 0.78; fH = fW / aspect; }
+  const fX = (w - fW) / 2, fY = (h - fH) / 2;
+
+  const ovalW  = fW * FACE.ovalWidthFrac;
+  const ovalH  = fH * FACE.ovalHeightFrac;
+  const ovalCX = fX + fW / 2;
+  const ovalCY = fY + fH * FACE.ovalCenterY;
+  const eyeY   = fY + fH * FACE.eyeLineFrac;
+  const crownY = fY + fH * FACE.crownLineFrac;
+  const chinY  = fY + fH * FACE.chinLineFrac;
+  const lblX   = fX + fW + 7;
+  const corners = [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
+  const L = 16;
+
+  return (
+    <svg className="svg-overlay" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <defs>
+        <mask id="m">
+          <rect width="100%" height="100%" fill="white"/>
+          <rect x={fX} y={fY} width={fW} height={fH} fill="black"/>
+        </mask>
+      </defs>
+
+      {/* vignette */}
+      <rect width="100%" height="100%" fill="rgba(0,0,0,0.56)" mask="url(#m)"/>
+
+      {/* frame */}
+      <rect x={fX} y={fY} width={fW} height={fH} fill="none"
+            stroke="#E8D5A3" strokeWidth="1.5"/>
+
+      {/* corners */}
+      {corners.map(([cx,cy,dx,dy],i) => (
+        <g key={i}>
+          <line x1={cx} y1={cy} x2={cx+dx*L} y2={cy}   stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1={cx} y1={cy} x2={cx}       y2={cy+dy*L} stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round"/>
+        </g>
+      ))}
+
+      {/* face oval */}
+      <ellipse cx={ovalCX} cy={ovalCY} rx={ovalW/2} ry={ovalH/2}
+               fill="none" stroke="rgba(245,200,66,0.52)"
+               strokeWidth="1.4" strokeDasharray="5,4"/>
+
+      {/* guide lines */}
+      <line x1={fX+fW*0.28} y1={crownY} x2={fX+fW*0.72} y2={crownY}
+            stroke="rgba(245,200,66,0.32)" strokeWidth="1" strokeDasharray="3,5"/>
+      <line x1={fX+fW*0.18} y1={eyeY}   x2={fX+fW*0.82} y2={eyeY}
+            stroke="rgba(100,200,255,0.32)" strokeWidth="1" strokeDasharray="3,5"/>
+      <line x1={fX+fW*0.28} y1={chinY}  x2={fX+fW*0.72} y2={chinY}
+            stroke="rgba(245,200,66,0.32)" strokeWidth="1" strokeDasharray="3,5"/>
+
+      {/* labels — only if enough room */}
+      {w - (fX + fW) > 35 && <>
+        <text x={lblX} y={crownY+4} fill="rgba(245,200,66,0.6)"   fontSize="9" fontFamily="monospace">темя</text>
+        <text x={lblX} y={eyeY+4}   fill="rgba(100,200,255,0.6)"  fontSize="9" fontFamily="monospace">глаза</text>
+        <text x={lblX} y={chinY+4}  fill="rgba(245,200,66,0.6)"   fontSize="9" fontFamily="monospace">подб.</text>
+      </>}
+
+      {/* size label */}
+      <text x={fX+fW/2} y={fY-8} fill="#E8D5A3" fontSize="10"
+            fontFamily="monospace" textAnchor="middle" letterSpacing="1">
+        {size}
+      </text>
+
+      {/* crosshair */}
+      <line x1={ovalCX-7} y1={ovalCY} x2={ovalCX+7} y2={ovalCY} stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
+      <line x1={ovalCX} y1={ovalCY-7} x2={ovalCX} y2={ovalCY+7} stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
+    </svg>
+  );
+}
+
+function App() {
+  const videoRef  = useRef(null);
+  const canvasRef = useRef(null);
+  const wrapRef   = useRef(null);
+  const streamRef = useRef(null);
+
+  const [captured,   setCaptured]   = useState(null);
+  const [facingMode, setFacingMode] = useState("user");
+  const [camError,   setCamError]   = useState(null);
+  const [flash,      setFlash]      = useState(false);
+  const [wrapSize,   setWrapSize]   = useState({ w:0, h:0 });
+  const [photoType,  setPhotoType]  = useState("passport");
+
+  const startCamera = useCallback(async (mode) => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setCamError(null);
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: mode, width: { ideal:1920 }, height: { ideal:1080 } },
+        audio: false,
+      });
+      streamRef.current = s;
+      if (videoRef.current) videoRef.current.srcObject = s;
+    } catch {
+      setCamError("Нет доступа к камере.\nРазрешите использование камеры в настройках браузера.");
+    }
+  }, []);
+
+  useEffect(() => {
+    startCamera("user");
+    return () => streamRef.current?.getTracks().forEach(t => t.stop());
+  }, []);
+
+  useEffect(() => {
+    const update = () => {
+      if (wrapRef.current) {
+        const r = wrapRef.current.getBoundingClientRect();
+        setWrapSize({ w: r.width, h: r.height });
+      }
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    if (wrapRef.current) ro.observe(wrapRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  const handleFlip = () => {
+    const next = facingMode === "user" ? "environment" : "user";
+    setFacingMode(next);
+    startCamera(next);
+  };
+
+  const capture = () => {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    const { aspect } = TYPES[photoType];
+    const vw = video.videoWidth, vh = video.videoHeight;
+    let cW, cH;
+    if (vw/vh > aspect) { cH = vh; cW = vh * aspect; }
+    else                { cW = vw; cH = vw / aspect; }
+    const cx = (vw-cW)/2, cy = (vh-cH)/2;
+    canvas.width = cW; canvas.height = cH;
+    const ctx = canvas.getContext("2d");
+    if (facingMode === "user") { ctx.translate(cW,0); ctx.scale(-1,1); }
+    ctx.drawImage(video, cx, cy, cW, cH, 0, 0, cW, cH);
+    setFlash(true);
+    setTimeout(() => setFlash(false), 280);
+    setCaptured(canvas.toDataURL("image/jpeg", 0.95));
+  };
+
+  const download = () => {
+    if (!captured) return;
+    const a = document.createElement("a");
+    a.href = captured;
+    a.download = `doc_photo_${Date.now()}.jpg`;
+    a.click();
+  };
+
+  const retake = () => setCaptured(null);
+
+  const reqs = REQS.map(([k,v]) => [k, v ?? TYPES[photoType].size]);
+
+  return (
+    <div className="root">
+      {/* ── Header ── */}
+      <div className="header">
+        <div className="header-title">
+          <span className="header-icon">⊞</span> ФОТО НА ДОКУМЕНТЫ РФ
+        </div>
+        <div className="type-pills">
+          {Object.entries(TYPES).map(([key, val]) => (
+            <button
+              key={key}
+              className={`type-pill${photoType === key ? " active" : ""}`}
+              onClick={() => setPhotoType(key)}
+            >{val.label}</button>
+          ))}
+        </div>
+        <div className="type-desc">
+          {TYPES[photoType].size} · {TYPES[photoType].desc}
+        </div>
+      </div>
+
+      {/* ── Viewfinder ── */}
+      <div className="viewfinder" ref={wrapRef}>
+        {!captured ? (<>
+          <video
+            ref={videoRef}
+            autoPlay playsInline muted
+            className={facingMode === "user" ? "mirror" : ""}
+          />
+          {flash && <div className="flash" key={Date.now()} />}
+          <Overlay w={wrapSize.w} h={wrapSize.h} type={photoType} />
+          {camError && (
+            <div className="cam-error">
+              <span>📷</span>{camError}
+            </div>
+          )}
+          <div className="hint">
+            Совместите лицо с овалом · взгляд прямо · светлый фон
+          </div>
+        </>) : (
+          <div className="preview-wrap">
+            <img src={captured} alt="preview" />
+            <div className="preview-badge">
+              <span style={{color:"#4ade80"}}>✓</span> Фото готово
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Controls ── */}
+      <div className="controls">
+        {!captured ? (<>
+          <button className="flip-btn" onClick={handleFlip} aria-label="Перевернуть камеру">
+            <FlipIcon />
+          </button>
+          <button className="capture-btn" onClick={capture} aria-label="Сфотографировать">
+            <div className="capture-inner" />
+          </button>
+          <div className="spacer" />
+        </>) : (<>
+          <button className="action-btn" onClick={retake}>↩ Переснять</button>
+          <button className="action-btn primary" onClick={download}>↓ Сохранить</button>
+        </>)}
+      </div>
+
+      {/* ── Requirements ── */}
+      <div className="req-panel">
+        <div className="req-title">ТРЕБОВАНИЯ ГОСТ Р 52425-2005</div>
+        <div className="req-grid">
+          {reqs.map(([k,v]) => (
+            <div className="req-item" key={k}>
+              <span className="req-key">{k}</span>
+              <span className="req-val">{v}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <canvas ref={canvasRef} style={{display:"none"}} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
