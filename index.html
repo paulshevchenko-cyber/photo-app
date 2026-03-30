@@ -9,6 +9,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<!-- MediaPipe Selfie Segmentation -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/selfie_segmentation.js" crossorigin="anonymous"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body,#root{height:100%;background:#0E0E12}
@@ -16,21 +18,46 @@ body{overflow:hidden;-webkit-tap-highlight-color:transparent;font-family:'Courie
 button{cursor:pointer;font-family:'Courier New',monospace}
 button:active{opacity:.75}
 .root{height:100vh;display:flex;flex-direction:column;background:#0E0E12;color:#E8D5A3;max-width:480px;margin:0 auto;user-select:none}
-.header{padding:10px 14px 8px;border-bottom:1px solid rgba(232,213,163,.1);background:rgba(0,0,0,.5);flex-shrink:0}
-.header-title{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.16em;color:#E8D5A3;margin-bottom:8px;font-weight:bold}
+
+/* ── Header ── */
+.header{padding:10px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:rgba(0,0,0,.5);flex-shrink:0}
+.header-title{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.16em;color:#E8D5A3;margin-bottom:7px;font-weight:bold}
 .header-icon{color:#F5C842;font-size:13px}
 .type-pills{display:flex;gap:5px;flex-wrap:wrap}
 .type-pill{background:transparent;border:1px solid rgba(232,213,163,.22);border-radius:3px;color:rgba(232,213,163,.5);font-size:10px;padding:4px 9px;letter-spacing:.04em;transition:all .15s}
 .type-pill.active{background:rgba(245,200,66,.13);border-color:#F5C842;color:#F5C842}
-.type-desc{font-size:9px;color:rgba(232,213,163,.35);margin-top:5px;letter-spacing:.07em}
-.viewfinder{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
-.viewfinder video{width:100%;height:100%;object-fit:cover;display:block}
-.mirror{transform:scaleX(-1)}
+.type-desc{font-size:9px;color:rgba(232,213,163,.35);margin-top:4px;letter-spacing:.07em}
+
+/* ── Viewfinder ── */
+.viewfinder{flex:1;position:relative;background:#111;overflow:hidden;min-height:0}
+.preview-canvas{width:100%;height:100%;object-fit:cover;display:block}
+.mirror-canvas{transform:scaleX(-1)}
+video.hidden-src{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 .svg-overlay{position:absolute;inset:0;pointer-events:none}
-.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:10;animation:flashFade .25s forwards}
+.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:10;animation:flashFade .22s forwards}
 @keyframes flashFade{to{opacity:0}}
-.hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:rgba(232,213,163,.75);font-size:9px;padding:5px 14px;border-radius:20px;white-space:nowrap;letter-spacing:.06em;border:1px solid rgba(232,213,163,.13);pointer-events:none;transition:color .3s,border-color .3s}
+
+/* hint bar */
+.hint{
+  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.7);color:rgba(232,213,163,.78);
+  font-size:9px;padding:5px 14px;border-radius:20px;
+  white-space:nowrap;letter-spacing:.06em;
+  border:1px solid rgba(232,213,163,.14);pointer-events:none;
+  transition:color .25s,border-color .25s;max-width:90%;text-align:center;
+}
 .hint.ready{color:#4ade80;border-color:rgba(74,222,128,.35)}
+.hint.warn{color:#fb923c;border-color:rgba(251,146,60,.3)}
+
+/* seg loading badge */
+.seg-badge{
+  position:absolute;top:10px;left:50%;transform:translateX(-50%);
+  background:rgba(0,0,0,.65);color:rgba(232,213,163,.6);
+  font-size:8px;padding:3px 10px;border-radius:10px;
+  border:1px solid rgba(232,213,163,.12);pointer-events:none;
+  letter-spacing:.08em;white-space:nowrap;
+}
+
 .cam-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#E8D5A3;font-size:13px;text-align:center;padding:28px;background:rgba(0,0,0,.87);white-space:pre-line;line-height:1.6}
 .cam-error span{font-size:36px}
 .proc-overlay{position:absolute;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20}
@@ -38,27 +65,37 @@ button:active{opacity:.75}
 @keyframes spin{to{transform:rotate(360deg)}}
 .proc-label{color:#E8D5A3;font-size:11px;letter-spacing:.12em}
 .proc-sub{font-size:9px;color:rgba(232,213,163,.4);letter-spacing:.07em}
-.preview-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#111115;position:relative}
-.preview-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+
+/* preview after capture */
+.captured-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#111115;position:relative}
+.captured-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .preview-badge{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.75);border:1px solid #4ade80;border-radius:4px;padding:4px 10px;font-size:11px;color:#fff;letter-spacing:.05em}
-.status-bar{display:flex;gap:6px;padding:6px 10px;background:rgba(0,0,0,.45);border-top:1px solid rgba(232,213,163,.07);flex-shrink:0}
-.status-pill{flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);font-size:9px;letter-spacing:.05em;transition:border-color .3s;overflow:hidden}
-.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .3s}
+
+/* ── Status bar ── */
+.status-bar{display:flex;gap:5px;padding:5px 9px;background:rgba(0,0,0,.45);border-top:1px solid rgba(232,213,163,.07);flex-shrink:0}
+.status-pill{flex:1;display:flex;align-items:center;gap:4px;padding:4px 7px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);font-size:8.5px;letter-spacing:.04em;transition:border-color .3s;overflow:hidden;min-width:0}
+.status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .3s}
 .status-text{transition:color .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.controls{display:flex;align-items:center;justify-content:space-around;padding:12px 24px;background:#0E0E12;border-top:1px solid rgba(232,213,163,.08);gap:10px;flex-shrink:0}
-.capture-btn{width:66px;height:66px;border-radius:50%;border:3px solid #F5C842;background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 18px rgba(245,200,66,.18);transition:border-color .3s,box-shadow .3s}
+
+/* ── Controls ── */
+.controls{display:flex;align-items:center;justify-content:space-around;padding:11px 24px;background:#0E0E12;border-top:1px solid rgba(232,213,163,.08);gap:10px;flex-shrink:0}
+.capture-btn{width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 16px rgba(245,200,66,.16);transition:border-color .3s,box-shadow .3s}
 .capture-btn.ready{border-color:#4ade80;animation:readyPulse 1.6s ease-in-out infinite}
-@keyframes readyPulse{0%,100%{box-shadow:0 0 18px rgba(74,222,128,.25)}50%{box-shadow:0 0 32px rgba(74,222,128,.6)}}
-.capture-btn:active{transform:scale(.94)}
-.capture-inner{width:50px;height:50px;border-radius:50%;background:#F5C842;transition:background .3s}
+@keyframes readyPulse{0%,100%{box-shadow:0 0 16px rgba(74,222,128,.22)}50%{box-shadow:0 0 28px rgba(74,222,128,.55)}}
+.capture-btn:active{transform:scale(.93)}
+.capture-inner{width:48px;height:48px;border-radius:50%;background:#F5C842;transition:background .3s}
 .capture-btn.ready .capture-inner{background:#4ade80}
-.flip-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(232,213,163,.22);background:rgba(232,213,163,.04);color:#E8D5A3;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.spacer{width:44px;height:44px;flex-shrink:0}
-.action-btn{flex:1;padding:12px 0;background:transparent;border:1px solid rgba(232,213,163,.28);color:#E8D5A3;border-radius:4px;font-size:12px;letter-spacing:.1em}
+.flip-btn{width:42px;height:42px;border-radius:50%;border:1px solid rgba(232,213,163,.22);background:rgba(232,213,163,.04);color:#E8D5A3;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+/* bg toggle */
+.bg-btn{width:42px;height:42px;border-radius:50%;border:1px solid rgba(232,213,163,.22);background:rgba(232,213,163,.04);color:#E8D5A3;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;transition:border-color .2s,background .2s}
+.bg-btn.active{border-color:#60a5fa;background:rgba(96,165,250,.12);color:#60a5fa}
+.action-btn{flex:1;padding:11px 0;background:transparent;border:1px solid rgba(232,213,163,.28);color:#E8D5A3;border-radius:4px;font-size:12px;letter-spacing:.1em}
 .action-btn.primary{background:rgba(245,200,66,.13);border-color:#F5C842;color:#F5C842}
-.req-panel{padding:8px 14px 12px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.28);flex-shrink:0}
-.req-title{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.3);margin-bottom:6px}
-.req-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px}
+
+/* ── Requirements ── */
+.req-panel{padding:7px 14px 11px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.28);flex-shrink:0}
+.req-title{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.3);margin-bottom:5px}
+.req-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 14px}
 .req-item{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;border-bottom:1px solid rgba(232,213,163,.06)}
 .req-key{color:rgba(232,213,163,.37)}
 .req-val{color:rgba(232,213,163,.72);text-align:right}
@@ -69,124 +106,21 @@ button:active{opacity:.75}
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback } = React;
 
-const FG = { ovalCY:.47, ovalH:.74, ovalW:.54, eyeY:.55, chinY:.85, crownY:.11 };
-const TYPES = {
-  passport:{ label:"Паспорт / Загран", size:"35×45 мм", aspect:35/45, desc:"Загранпаспорт, ВНЖ, СНИЛС" },
-  visa:    { label:"Виза",             size:"35×45 мм", aspect:35/45, desc:"Шенген, US, UK, Китай" },
-  zagran:  { label:"Воен. билет",      size:"30×40 мм", aspect:30/40, desc:"Военный билет, приписное" },
+// ═══════════════════════════════════════
+// Constants
+// ═══════════════════════════════════════
+const FG={ovalCY:.47,ovalH:.74,ovalW:.54,eyeY:.55,chinY:.85,crownY:.11};
+const TYPES={
+  passport:{label:"Паспорт / Загран",size:"35×45 мм",aspect:35/45,desc:"Загранпаспорт, ВНЖ, СНИЛС"},
+  visa:    {label:"Виза",            size:"35×45 мм",aspect:35/45,desc:"Шенген, US, UK, Китай"},
+  zagran:  {label:"Воен. билет",     size:"30×40 мм",aspect:30/40,desc:"Военный билет, приписное"},
 };
 const REQS=[["Размер",null],["Лицо","70–80% высоты"],["Фон","белый / светло-серый"],
             ["Взгляд","прямо в объектив"],["Выражение","нейтральное"],["Качество","без теней, резкое"]];
 
-// ── Image processing ───────────────────────────────
-
-function sampleBrightness(video) {
-  const W=64,H=48;
-  const c=document.createElement('canvas');c.width=W;c.height=H;
-  const ctx=c.getContext('2d');
-  ctx.drawImage(video,video.videoWidth*.3,video.videoHeight*.2,video.videoWidth*.4,video.videoHeight*.6,0,0,W,H);
-  const d=ctx.getImageData(0,0,W,H).data;
-  let sum=0,lSum=0,rSum=0;
-  const n=W*H;
-  for(let i=0;i<n;i++){
-    const idx=i*4,b=.299*d[idx]+.587*d[idx+1]+.114*d[idx+2];
-    sum+=b;if(i%W<W/2)lSum+=b;else rSum+=b;
-  }
-  const avg=sum/n;
-  return{avg,evenness:avg>0?Math.abs(lSum-rSum)/(avg*n):0};
-}
-
-function evalFacePos(face,vw,vh){
-  const{x,y,width:fw,height:fh}=face.boundingBox;
-  const cx=(x+fw/2)/vw,cy=(y+fh/2)/vh,nh=fh/vh;
-  if(nh<0.36)return'too_far';
-  if(nh>0.80)return'too_close';
-  if(Math.abs(cx-.50)>.15||Math.abs(cy-.47)>.15)return'off_center';
-  return'ok';
-}
-
-function replaceBackground(imageData,w,h){
-  const d=imageData.data;
-  const cs=Math.floor(Math.min(w,h)*.07);
-  let r=0,g=0,b=0,cnt=0;
-  for(let y=0;y<cs;y++)for(let x=0;x<cs;x++){
-    [[x,y],[w-1-x,y],[x,h-1-y],[w-1-x,h-1-y]].forEach(([px,py])=>{
-      const i=(py*w+px)*4;r+=d[i];g+=d[i+1];b+=d[i+2];cnt++;
-    });
-  }
-  r/=cnt;g/=cnt;b/=cnt;
-  for(let i=0;i<d.length;i+=4){
-    const dr=d[i]-r,dg=d[i+1]-g,db=d[i+2]-b;
-    if(Math.sqrt(dr*dr+dg*dg+db*db)<72){d[i]=255;d[i+1]=255;d[i+2]=255;}
-  }
-  return imageData;
-}
-
-function smoothFaceLight(imageData,w,h){
-  const d=imageData.data;
-  const fx=Math.floor(w*.2),fy=Math.floor(h*.08),fw=Math.floor(w*.6),fh=Math.floor(h*.80);
-  let sum=0,cnt=0;
-  for(let y=fy;y<Math.min(fy+fh,h);y++)for(let x=fx;x<Math.min(fx+fw,w);x++){
-    const i=(y*w+x)*4;
-    if(d[i]>245&&d[i+1]>245&&d[i+2]>245)continue;
-    sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2];cnt++;
-  }
-  if(!cnt)return imageData;
-  const mult=162/(sum/cnt);
-  if(Math.abs(mult-1)<.08)return imageData;
-  const cl=v=>Math.max(0,Math.min(255,Math.round(v)));
-  for(let y=fy;y<Math.min(fy+fh,h);y++)for(let x=fx;x<Math.min(fx+fw,w);x++){
-    const i=(y*w+x)*4;
-    if(d[i]>245&&d[i+1]>245&&d[i+2]>245)continue;
-    d[i]=cl(d[i]*mult);d[i+1]=cl(d[i+1]*mult);d[i+2]=cl(d[i+2]*mult);
-  }
-  return imageData;
-}
-
-// ── SVG Overlay ────────────────────────────────────
-
-function Overlay({w,h,type,faceOk}){
-  if(!w||!h)return null;
-  const{aspect,size}=TYPES[type];
-  let fH=h*.83,fW=fH*aspect;
-  if(fW>w*.78){fW=w*.78;fH=fW/aspect;}
-  const fX=(w-fW)/2,fY=(h-fH)/2;
-  const oW=fW*FG.ovalW,oH=fH*FG.ovalH;
-  const oCX=fX+fW/2,oCY=fY+fH*FG.ovalCY;
-  const eY=fY+fH*FG.eyeY,cY=fY+fH*FG.crownY,chY=fY+fH*FG.chinY;
-  const oStroke=faceOk==='ok'?'rgba(74,222,128,.75)':faceOk==='none'||faceOk==='unavailable'?'rgba(245,200,66,.52)':'rgba(249,115,22,.75)';
-  const cC=faceOk==='ok'?'#4ade80':'#F5C842';
-  const L=16,lb=fX+fW+7,room=w-(fX+fW)>36;
-  const corners=[[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
-  return(
-    <svg className="svg-overlay" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <defs><mask id="m"><rect width="100%" height="100%" fill="white"/><rect x={fX} y={fY} width={fW} height={fH} fill="black"/></mask></defs>
-      <rect width="100%" height="100%" fill="rgba(0,0,0,.56)" mask="url(#m)"/>
-      <rect x={fX} y={fY} width={fW} height={fH} fill="none" stroke="#E8D5A3" strokeWidth="1.5"/>
-      {corners.map(([cx,cy,dx,dy],i)=>(
-        <g key={i}>
-          <line x1={cx} y1={cy} x2={cx+dx*L} y2={cy} stroke={cC} strokeWidth="2.5" strokeLinecap="round"/>
-          <line x1={cx} y1={cy} x2={cx} y2={cy+dy*L} stroke={cC} strokeWidth="2.5" strokeLinecap="round"/>
-        </g>
-      ))}
-      <ellipse cx={oCX} cy={oCY} rx={oW/2} ry={oH/2} fill="none" stroke={oStroke} strokeWidth="1.8" strokeDasharray="5,4"/>
-      <line x1={fX+fW*.28} y1={cY}  x2={fX+fW*.72} y2={cY}  stroke="rgba(245,200,66,.3)"  strokeWidth="1" strokeDasharray="3,5"/>
-      <line x1={fX+fW*.18} y1={eY}  x2={fX+fW*.82} y2={eY}  stroke="rgba(100,200,255,.3)" strokeWidth="1" strokeDasharray="3,5"/>
-      <line x1={fX+fW*.28} y1={chY} x2={fX+fW*.72} y2={chY} stroke="rgba(245,200,66,.3)"  strokeWidth="1" strokeDasharray="3,5"/>
-      {room&&<>
-        <text x={lb} y={cY+4}  fill="rgba(245,200,66,.6)"  fontSize="9" fontFamily="monospace">темя</text>
-        <text x={lb} y={eY+4}  fill="rgba(100,200,255,.6)" fontSize="9" fontFamily="monospace">глаза</text>
-        <text x={lb} y={chY+4} fill="rgba(245,200,66,.6)"  fontSize="9" fontFamily="monospace">подб.</text>
-      </>}
-      <text x={fX+fW/2} y={fY-8} fill="#E8D5A3" fontSize="10" fontFamily="monospace" textAnchor="middle" letterSpacing="1">{size}</text>
-      <line x1={oCX-7} y1={oCY} x2={oCX+7} y2={oCY} stroke="rgba(255,255,255,.2)" strokeWidth="1"/>
-      <line x1={oCX} y1={oCY-7} x2={oCX} y2={oCY+7} stroke="rgba(255,255,255,.2)" strokeWidth="1"/>
-    </svg>
-  );
-}
-
-// ── Status data ────────────────────────────────────
-
+// ═══════════════════════════════════════
+// Status descriptors
+// ═══════════════════════════════════════
 const FACE_INFO={
   loading:    {dot:'#666',   text:'Инициализация...'},
   none:       {dot:'#ef4444',text:'Лицо не найдено'},
@@ -200,38 +134,237 @@ const LIGHT_INFO={
   checking:{dot:'#666',   text:'Анализ...'},
   dark:    {dot:'#ef4444',text:'Слишком темно'},
   bright:  {dot:'#f97316',text:'Слишком ярко'},
-  uneven:  {dot:'#f97316',text:'Неравномерный свет'},
-  ok:      {dot:'#4ade80',text:'Освещение ✓'},
+  uneven:  {dot:'#f97316',text:'Неравный свет'},
+  ok:      {dot:'#4ade80',text:'Свет ✓'},
+};
+const HEAD_INFO={
+  loading:    {dot:'#666',   text:'Анализ...'},
+  unavailable:{dot:'#888',   text:'Голова — вручную'},
+  tilt_left:  {dot:'#f97316',text:'Наклон влево'},
+  tilt_right: {dot:'#f97316',text:'Наклон вправо'},
+  turn_left:  {dot:'#f97316',text:'Повернитесь правее'},
+  turn_right: {dot:'#f97316',text:'Повернитесь левее'},
+  look_up:    {dot:'#f97316',text:'Опустите подбородок'},
+  look_down:  {dot:'#f97316',text:'Поднимите подбородок'},
+  ok:         {dot:'#4ade80',text:'Голова ✓'},
 };
 
-// ── App ────────────────────────────────────────────
+// ═══════════════════════════════════════
+// Image analysis helpers
+// ═══════════════════════════════════════
+function sampleBrightness(video){
+  const W=64,H=48,c=document.createElement('canvas');
+  c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(video,video.videoWidth*.3,video.videoHeight*.2,video.videoWidth*.4,video.videoHeight*.6,0,0,W,H);
+  const d=ctx.getImageData(0,0,W,H).data;
+  let sum=0,lSum=0,rSum=0;const n=W*H;
+  for(let i=0;i<n;i++){
+    const idx=i*4,b=.299*d[idx]+.587*d[idx+1]+.114*d[idx+2];
+    sum+=b;if(i%W<W/2)lSum+=b;else rSum+=b;
+  }
+  const avg=sum/n;
+  return{avg,evenness:avg>0?Math.abs(lSum-rSum)/(avg*n):0};
+}
 
+function evalFacePos(face,vw,vh){
+  const{x,y,width:fw,height:fh}=face.boundingBox;
+  const cx=(x+fw/2)/vw,cy=(y+fh/2)/vh,nh=fh/vh;
+  if(nh<0.33)return'too_far';
+  if(nh>0.82)return'too_close';
+  if(Math.abs(cx-.50)>.15||Math.abs(cy-.47)>.15)return'off_center';
+  return'ok';
+}
+
+function evalHeadPose(face){
+  const lm=face.landmarks;
+  if(!lm||lm.length<2)return'unavailable';
+  const eyes=lm.filter(l=>l.type==='eye');
+  const noses=lm.filter(l=>l.type==='nose');
+  const mouths=lm.filter(l=>l.type==='mouth');
+  if(eyes.length<2||!noses.length)return'unavailable';
+  const eL=eyes[0].locations[0],eR=eyes[1].locations[0];
+  const nP=noses[0].locations[0];
+  // Roll (tilt)
+  const angle=Math.atan2(eR.y-eL.y,eR.x-eL.x)*180/Math.PI;
+  if(angle>9)return'tilt_right';
+  if(angle<-9)return'tilt_left';
+  // Yaw (left/right turn) – nose offset from eye midpoint
+  const eyeMidX=(eL.x+eR.x)/2;
+  const fW=face.boundingBox.width;
+  const nOff=(nP.x-eyeMidX)/fW;
+  if(nOff>0.10)return'turn_left';
+  if(nOff<-0.10)return'turn_right';
+  // Pitch (up/down) – eye midpoint to nose, normalised by face height
+  const eyeMidY=(eL.y+eR.y)/2;
+  const fH=face.boundingBox.height;
+  const eyeToNose=(nP.y-eyeMidY)/fH;
+  if(mouths.length){
+    const mP=mouths[0].locations[0];
+    const noseToMouth=(mP.y-nP.y)/fH;
+    // If face tilted up: eyeToNose shrinks, noseToMouth grows
+    if(eyeToNose<0.20)return'look_down';   // chin up → look down needed
+    if(eyeToNose>0.42)return'look_up';     // chin down → look up needed
+    if(noseToMouth<0.15)return'look_up';
+    if(noseToMouth>0.38)return'look_down';
+  } else {
+    if(eyeToNose<0.22)return'look_down';
+    if(eyeToNose>0.44)return'look_up';
+  }
+  return'ok';
+}
+
+function smoothFaceLight(imgData,w,h){
+  const d=imgData.data;
+  const fx=Math.floor(w*.2),fy=Math.floor(h*.08),fw2=Math.floor(w*.6),fh2=Math.floor(h*.8);
+  let sum=0,cnt=0;
+  for(let y=fy;y<Math.min(fy+fh2,h);y++)
+    for(let x=fx;x<Math.min(fx+fw2,w);x++){
+      const i=(y*w+x)*4;
+      if(d[i]>248&&d[i+1]>248&&d[i+2]>248)continue;
+      sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2];cnt++;
+    }
+  if(!cnt||sum/cnt===0)return imgData;
+  const mult=162/(sum/cnt);
+  if(Math.abs(mult-1)<.07)return imgData;
+  const cl=v=>Math.max(0,Math.min(255,Math.round(v)));
+  for(let y=fy;y<Math.min(fy+fh2,h);y++)
+    for(let x=fx;x<Math.min(fx+fw2,w);x++){
+      const i=(y*w+x)*4;
+      if(d[i]>248&&d[i+1]>248&&d[i+2]>248)continue;
+      d[i]=cl(d[i]*mult);d[i+1]=cl(d[i+1]*mult);d[i+2]=cl(d[i+2]*mult);
+    }
+  return imgData;
+}
+
+// ═══════════════════════════════════════
+// SVG Overlay
+// ═══════════════════════════════════════
+function Overlay({w,h,type,faceOk,headOk}){
+  if(!w||!h)return null;
+  const{aspect,size}=TYPES[type];
+  let fH=h*.83,fW=fH*aspect;
+  if(fW>w*.78){fW=w*.78;fH=fW/aspect;}
+  const fX=(w-fW)/2,fY=(h-fH)/2;
+  const oW=fW*FG.ovalW,oH=fH*FG.ovalH;
+  const oCX=fX+fW/2,oCY=fY+fH*FG.ovalCY;
+  const eY=fY+fH*FG.eyeY,crY=fY+fH*FG.crownY,chY=fY+fH*FG.chinY;
+  const fOk=faceOk==='ok',hOk=headOk==='ok'||headOk==='unavailable';
+  const allOk=fOk&&hOk;
+  const oStroke=allOk?'rgba(74,222,128,.8)':faceOk==='none'?'rgba(245,200,66,.5)':'rgba(249,115,22,.7)';
+  const cC=allOk?'#4ade80':'#F5C842';
+  const L=16;
+  const corners=[[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
+  const lb=fX+fW+7,room=w-(fX+fW)>36;
+  return(
+    <svg className="svg-overlay" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
+      <defs><mask id="m"><rect width="100%" height="100%" fill="white"/><rect x={fX} y={fY} width={fW} height={fH} fill="black"/></mask></defs>
+      <rect width="100%" height="100%" fill="rgba(0,0,0,.45)" mask="url(#m)"/>
+      <rect x={fX} y={fY} width={fW} height={fH} fill="none" stroke="rgba(232,213,163,.5)" strokeWidth="1.2"/>
+      {corners.map(([cx,cy,dx,dy],i)=>(
+        <g key={i}>
+          <line x1={cx} y1={cy} x2={cx+dx*L} y2={cy} stroke={cC} strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1={cx} y1={cy} x2={cx} y2={cy+dy*L} stroke={cC} strokeWidth="2.5" strokeLinecap="round"/>
+        </g>
+      ))}
+      <ellipse cx={oCX} cy={oCY} rx={oW/2} ry={oH/2} fill="none" stroke={oStroke} strokeWidth="1.8" strokeDasharray="5,4"/>
+      <line x1={fX+fW*.28} y1={crY} x2={fX+fW*.72} y2={crY} stroke="rgba(245,200,66,.28)" strokeWidth="1" strokeDasharray="3,5"/>
+      <line x1={fX+fW*.18} y1={eY}  x2={fX+fW*.82} y2={eY}  stroke="rgba(100,200,255,.28)" strokeWidth="1" strokeDasharray="3,5"/>
+      <line x1={fX+fW*.28} y1={chY} x2={fX+fW*.72} y2={chY} stroke="rgba(245,200,66,.28)" strokeWidth="1" strokeDasharray="3,5"/>
+      {room&&<>
+        <text x={lb} y={crY+4} fill="rgba(245,200,66,.55)" fontSize="9" fontFamily="monospace">темя</text>
+        <text x={lb} y={eY+4}  fill="rgba(100,200,255,.55)" fontSize="9" fontFamily="monospace">глаза</text>
+        <text x={lb} y={chY+4} fill="rgba(245,200,66,.55)" fontSize="9" fontFamily="monospace">подб.</text>
+      </>}
+      <text x={fX+fW/2} y={fY-7} fill="rgba(232,213,163,.7)" fontSize="10" fontFamily="monospace" textAnchor="middle" letterSpacing="1">{size}</text>
+    </svg>
+  );
+}
+
+// ═══════════════════════════════════════
+// App
+// ═══════════════════════════════════════
 function App(){
-  const videoRef=useRef(null),canvasRef=useRef(null),wrapRef=useRef(null);
-  const streamRef=useRef(null),detectorRef=useRef(null),timerRef=useRef(null);
+  const videoRef    =useRef(null);
+  const canvasRef   =useRef(null);  // hidden capture canvas
+  const previewRef  =useRef(null);  // live display canvas
+  const wrapRef     =useRef(null);
+  const streamRef   =useRef(null);
+  const detectorRef =useRef(null);
+  const segRef      =useRef(null);  // MediaPipe segmentation instance
+  const rafRef      =useRef(null);  // requestAnimationFrame id
+  const timerRef    =useRef(null);
 
-  const[captured,setCaptured]=useState(null);
-  const[facingMode,setFacingMode]=useState('user');
-  const[camError,setCamError]=useState(null);
-  const[flash,setFlash]=useState(false);
-  const[wrapSize,setWrapSize]=useState({w:0,h:0});
-  const[photoType,setPhotoType]=useState('passport');
-  const[faceStatus,setFaceStatus]=useState('loading');
+  const[captured,   setCaptured]   =useState(null);
+  const[facingMode, setFacingMode] =useState('user');
+  const[camError,   setCamError]   =useState(null);
+  const[flash,      setFlash]      =useState(false);
+  const[wrapSize,   setWrapSize]   =useState({w:0,h:0});
+  const[photoType,  setPhotoType]  =useState('passport');
+  const[faceStatus, setFaceStatus] =useState('loading');
   const[lightStatus,setLightStatus]=useState('checking');
-  const[processing,setProcessing]=useState(false);
+  const[headStatus, setHeadStatus] =useState('loading');
+  const[processing, setProcessing] =useState(false);
+  const[segReady,   setSegReady]   =useState(false);
+  const[segLoading, setSegLoading] =useState(false);
+  const[bgRemove,   setBgRemove]   =useState(false); // user toggle
 
-  const isReady=(faceStatus==='ok'||faceStatus==='unavailable')&&lightStatus==='ok';
+  const isReady=(faceStatus==='ok'||faceStatus==='unavailable')
+              &&lightStatus==='ok'
+              &&(headStatus==='ok'||headStatus==='unavailable');
 
+  // ── Init MediaPipe Segmentation ────────────────────────
+  const initSegmentation=useCallback(()=>{
+    if(segRef.current||segLoading)return;
+    if(typeof SelfieSegmentation==='undefined'){
+      console.warn('SelfieSegmentation not loaded');return;
+    }
+    setSegLoading(true);
+    const seg=new SelfieSegmentation({
+      locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/${f}`
+    });
+    seg.setOptions({modelSelection:1,selfieMode:true});
+    seg.onResults((results)=>{
+      const canvas=previewRef.current;
+      const video=videoRef.current;
+      if(!canvas||!video||!results.segmentationMask)return;
+      const w=canvas.width,h=canvas.height;
+      const ctx=canvas.getContext('2d');
+      ctx.clearRect(0,0,w,h);
+      // White background
+      ctx.fillStyle='#ffffff';
+      ctx.fillRect(0,0,w,h);
+      // Clip to person mask
+      ctx.save();
+      ctx.drawImage(results.segmentationMask,0,0,w,h);
+      ctx.globalCompositeOperation='source-in';
+      ctx.drawImage(video,0,0,w,h);
+      ctx.restore();
+      ctx.globalCompositeOperation='source-over';
+    });
+    seg.initialize().then(()=>{
+      segRef.current=seg;
+      setSegReady(true);
+      setSegLoading(false);
+    }).catch(e=>{
+      console.warn('Seg init failed:',e);
+      setSegLoading(false);
+    });
+  },[segLoading]);
+
+  // ── Camera ─────────────────────────────────────────────
   const startCamera=useCallback(async(mode)=>{
+    cancelAnimationFrame(rafRef.current);
     clearTimeout(timerRef.current);
     streamRef.current?.getTracks().forEach(t=>t.stop());
-    setCamError(null);setFaceStatus('loading');setLightStatus('checking');
+    setCamError(null);setFaceStatus('loading');setLightStatus('checking');setHeadStatus('loading');
     try{
       const s=await navigator.mediaDevices.getUserMedia({
         video:{facingMode:mode,width:{ideal:1920},height:{ideal:1080}},audio:false
       });
       streamRef.current=s;
-      if(videoRef.current)videoRef.current.srcObject=s;
+      const video=videoRef.current;
+      if(video){video.srcObject=s;}
     }catch{setCamError('Нет доступа к камере.\nРазрешите камеру в настройках браузера.');}
   },[]);
 
@@ -241,9 +374,15 @@ function App(){
       catch{detectorRef.current=null;}
     }
     startCamera('user');
-    return()=>{streamRef.current?.getTracks().forEach(t=>t.stop());clearTimeout(timerRef.current);};
+    return()=>{
+      cancelAnimationFrame(rafRef.current);
+      clearTimeout(timerRef.current);
+      streamRef.current?.getTracks().forEach(t=>t.stop());
+      segRef.current?.close?.();
+    };
   },[]);
 
+  // ── Wrap size ──────────────────────────────────────────
   useEffect(()=>{
     const update=()=>{
       if(wrapRef.current){
@@ -257,12 +396,53 @@ function App(){
     return()=>ro.disconnect();
   },[]);
 
+  // ── Live render loop (canvas) ──────────────────────────
+  useEffect(()=>{
+    const video=videoRef.current;
+    const canvas=previewRef.current;
+    if(!video||!canvas)return;
+
+    let running=true;
+    const render=()=>{
+      if(!running)return;
+      if(video.readyState>=2&&video.videoWidth){
+        const vw=video.videoWidth,vh=video.videoHeight;
+        const cw=canvas.width||canvas.clientWidth||vw;
+        const ch=canvas.height||canvas.clientHeight||vh;
+        // fit cover
+        const scale=Math.max(cw/vw,ch/vh);
+        const dw=vw*scale,dh=vh*scale;
+        const dx=(cw-dw)/2,dy=(ch-dh)/2;
+        // Update canvas dimensions from element display size
+        const rect=canvas.getBoundingClientRect();
+        if(rect.width>0&&canvas.width!==Math.round(rect.width)){
+          canvas.width=Math.round(rect.width);
+          canvas.height=Math.round(rect.height);
+        }
+        const ctx=canvas.getContext('2d');
+        if(bgRemove&&segRef.current){
+          // Segmentation sends results async; we send frame to mediapipe
+          segRef.current.send({image:video}).catch(()=>{});
+          // onResults callback will draw; if it hasn't fired yet, just draw raw
+        } else {
+          ctx.clearRect(0,0,canvas.width,canvas.height);
+          ctx.drawImage(video,dx,dy,dw,dh);
+        }
+      }
+      rafRef.current=requestAnimationFrame(render);
+    };
+    render();
+    return()=>{running=false;cancelAnimationFrame(rafRef.current);};
+  },[bgRemove,segReady]);
+
+  // ── Analysis loop ──────────────────────────────────────
   useEffect(()=>{
     const analyze=async()=>{
       const video=videoRef.current;
       if(!video||video.readyState<2||!video.videoWidth){
         timerRef.current=setTimeout(analyze,500);return;
       }
+      // Lighting
       try{
         const{avg,evenness}=sampleBrightness(video);
         if(avg<75)setLightStatus('dark');
@@ -270,23 +450,39 @@ function App(){
         else if(evenness>.28)setLightStatus('uneven');
         else setLightStatus('ok');
       }catch{setLightStatus('ok');}
+      // Face position + head pose
       if(detectorRef.current){
         try{
           const faces=await detectorRef.current.detect(video);
-          setFaceStatus(faces.length?evalFacePos(faces[0],video.videoWidth,video.videoHeight):'none');
-        }catch{setFaceStatus('unavailable');}
-      }else{setFaceStatus('unavailable');}
+          if(faces.length){
+            setFaceStatus(evalFacePos(faces[0],video.videoWidth,video.videoHeight));
+            setHeadStatus(evalHeadPose(faces[0]));
+          }else{
+            setFaceStatus('none');setHeadStatus('unavailable');
+          }
+        }catch{setFaceStatus('unavailable');setHeadStatus('unavailable');}
+      }else{
+        setFaceStatus('unavailable');setHeadStatus('unavailable');
+      }
       timerRef.current=setTimeout(analyze,700);
     };
-    const boot=setTimeout(analyze,1000);
+    const boot=setTimeout(analyze,1200);
     return()=>{clearTimeout(boot);clearTimeout(timerRef.current);};
   },[facingMode]);
 
+  // ── Toggle BG removal ──────────────────────────────────
+  const toggleBg=()=>{
+    if(!bgRemove&&!segReady&&!segLoading) initSegmentation();
+    setBgRemove(v=>!v);
+  };
+
+  // ── Flip ──────────────────────────────────────────────
   const handleFlip=()=>{
     const next=facingMode==='user'?'environment':'user';
     setFacingMode(next);startCamera(next);
   };
 
+  // ── Capture + process ──────────────────────────────────
   const capture=async()=>{
     const video=videoRef.current,canvas=canvasRef.current;
     if(!video||!canvas)return;
@@ -301,14 +497,61 @@ function App(){
     ctx.drawImage(video,cx,cy,cW,cH,0,0,cW,cH);
     setFlash(true);setTimeout(()=>setFlash(false),280);
     setProcessing(true);
-    await new Promise(r=>setTimeout(r,60));
+    await new Promise(r=>setTimeout(r,80));
     try{
       ctx.setTransform(1,0,0,1,0,0);
+      // If segmentation ready, use it for background
+      if(bgRemove&&segRef.current){
+        // Create off-screen canvas with segmentation
+        const offW=cW,offH=cH;
+        const result=await new Promise(resolve=>{
+          const tmpCanvas=document.createElement('canvas');
+          tmpCanvas.width=offW;tmpCanvas.height=offH;
+          const tmpCtx=tmpCanvas.getContext('2d');
+          const tmpImg=new Image();
+          tmpImg.onload=async()=>{
+            // Use captured frame for segmentation
+            const tmpSeg=new SelfieSegmentation({
+              locateFile:(f)=>`https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation@0.1/${f}`
+            });
+            tmpSeg.setOptions({modelSelection:1});
+            tmpSeg.onResults((r)=>{
+              tmpCtx.fillStyle='#ffffff';
+              tmpCtx.fillRect(0,0,offW,offH);
+              tmpCtx.save();
+              tmpCtx.drawImage(r.segmentationMask,0,0,offW,offH);
+              tmpCtx.globalCompositeOperation='source-in';
+              tmpCtx.drawImage(tmpImg,0,0,offW,offH);
+              tmpCtx.restore();
+              tmpCtx.globalCompositeOperation='source-over';
+              resolve(tmpCanvas.toDataURL('image/jpeg',.95));
+              tmpSeg.close?.();
+            });
+            tmpSeg.initialize().then(()=>tmpSeg.send({image:tmpImg})).catch(()=>resolve(null));
+          };
+          tmpImg.src=canvas.toDataURL('image/jpeg',.95);
+        });
+        if(result){
+          setProcessing(false);
+          // Apply face light smoothing to final
+          const img=new Image();
+          img.onload=()=>{
+            canvas.width=cW;canvas.height=cH;
+            ctx.drawImage(img,0,0,cW,cH);
+            let imgData=ctx.getImageData(0,0,cW,cH);
+            imgData=smoothFaceLight(imgData,cW,cH);
+            ctx.putImageData(imgData,0,0);
+            setCaptured(canvas.toDataURL('image/jpeg',.95));
+          };
+          img.src=result;
+          return;
+        }
+      }
+      // Fallback: just smooth light
       let imgData=ctx.getImageData(0,0,cW,cH);
-      imgData=replaceBackground(imgData,cW,cH);
       imgData=smoothFaceLight(imgData,cW,cH);
       ctx.putImageData(imgData,0,0);
-    }catch(e){console.warn('Post-processing:',e);}
+    }catch(e){console.warn('Post-proc:',e);}
     setCaptured(canvas.toDataURL('image/jpeg',.95));
     setProcessing(false);
   };
@@ -319,24 +562,33 @@ function App(){
     a.href=captured;a.download=`doc_photo_${Date.now()}.jpg`;a.click();
   };
 
-  let hintText;
-  if(faceStatus==='loading')          hintText='Инициализация камеры...';
-  else if(faceStatus==='none')        hintText='Встаньте перед камерой';
-  else if(faceStatus==='too_close')   hintText='Отойдите дальше';
-  else if(faceStatus==='too_far')     hintText='Подойдите ближе к камере';
-  else if(faceStatus==='off_center')  hintText='Выровняйте лицо по центру';
-  else if(lightStatus==='dark')       hintText='Добавьте освещение';
-  else if(lightStatus==='bright')     hintText='Уменьшите яркость';
-  else if(lightStatus==='uneven')     hintText='Равномерный свет с обеих сторон';
-  else if(isReady)                    hintText='✓ Готово к съёмке — нажмите кнопку';
-  else                                hintText='Совместите лицо с овалом';
+  // ── Hint text priority ─────────────────────────────────
+  let hintText,hintClass='';
+  if(faceStatus==='loading'||headStatus==='loading') { hintText='Инициализация...'; }
+  else if(faceStatus==='none')       { hintText='Встаньте перед камерой'; hintClass='warn'; }
+  else if(faceStatus==='too_close')  { hintText='Отойдите дальше от камеры'; hintClass='warn'; }
+  else if(faceStatus==='too_far')    { hintText='Подойдите ближе к камере'; hintClass='warn'; }
+  else if(faceStatus==='off_center') { hintText='Выровняйте лицо по центру'; hintClass='warn'; }
+  else if(headStatus==='tilt_left')  { hintText='Наклоните голову вправо'; hintClass='warn'; }
+  else if(headStatus==='tilt_right') { hintText='Наклоните голову влево'; hintClass='warn'; }
+  else if(headStatus==='turn_left')  { hintText='Повернитесь правее'; hintClass='warn'; }
+  else if(headStatus==='turn_right') { hintText='Повернитесь левее'; hintClass='warn'; }
+  else if(headStatus==='look_up')    { hintText='Опустите подбородок'; hintClass='warn'; }
+  else if(headStatus==='look_down')  { hintText='Поднимите подбородок'; hintClass='warn'; }
+  else if(lightStatus==='dark')      { hintText='Добавьте освещения'; hintClass='warn'; }
+  else if(lightStatus==='bright')    { hintText='Уменьшите яркость'; hintClass='warn'; }
+  else if(lightStatus==='uneven')    { hintText='Освещение с обеих сторон равномерно'; hintClass='warn'; }
+  else if(isReady)                   { hintText='✓ Готово — нажмите кнопку'; hintClass='ready'; }
+  else                               { hintText='Совместите лицо с овалом'; }
 
   const fi=FACE_INFO[faceStatus]||FACE_INFO.loading;
   const li=LIGHT_INFO[lightStatus]||LIGHT_INFO.checking;
+  const hi=HEAD_INFO[headStatus]||HEAD_INFO.loading;
   const reqs=REQS.map(([k,v])=>[k,v??TYPES[photoType].size]);
 
   return(
     <div className="root">
+      {/* Header */}
       <div className="header">
         <div className="header-title"><span className="header-icon">⊞</span>ФОТО НА ДОКУМЕНТЫ РФ</div>
         <div className="type-pills">
@@ -349,45 +601,67 @@ function App(){
         <div className="type-desc">{TYPES[photoType].size} · {TYPES[photoType].desc}</div>
       </div>
 
+      {/* Viewfinder */}
       <div className="viewfinder" ref={wrapRef}>
         {!captured?(<>
-          <video ref={videoRef} autoPlay playsInline muted className={facingMode==='user'?'mirror':''}/>
+          {/* Hidden video source */}
+          <video ref={videoRef} autoPlay playsInline muted className="hidden-src"
+            onLoadedMetadata={()=>{
+              const c=previewRef.current;
+              if(c&&videoRef.current){
+                c.width=videoRef.current.videoWidth;
+                c.height=videoRef.current.videoHeight;
+              }
+            }}
+          />
+          {/* Live canvas */}
+          <canvas ref={previewRef}
+            className={`preview-canvas${facingMode==='user'?' mirror-canvas':''}`}
+          />
           {flash&&<div className="flash" key={Date.now()}/>}
-          <Overlay w={wrapSize.w} h={wrapSize.h} type={photoType} faceOk={faceStatus}/>
+          <Overlay w={wrapSize.w} h={wrapSize.h} type={photoType} faceOk={faceStatus} headOk={headStatus}/>
           {processing&&(
             <div className="proc-overlay">
               <div className="proc-spinner"/>
               <div className="proc-label">ОБРАБОТКА</div>
-              <div className="proc-sub">замена фона · коррекция света</div>
+              <div className="proc-sub">{bgRemove?'удаление фона · коррекция света':'коррекция света'}</div>
             </div>
           )}
+          {segLoading&&!processing&&(
+            <div className="seg-badge">⏳ Загрузка модели фона...</div>
+          )}
           {camError&&<div className="cam-error"><span>📷</span>{camError}</div>}
-          <div className={`hint${isReady?' ready':''}`}>{hintText}</div>
+          <div className={`hint${hintClass?' '+hintClass:''}`}>{hintText}</div>
         </>):(
-          <div className="preview-wrap">
+          <div className="captured-wrap">
             <img src={captured} alt="preview"/>
             <div className="preview-badge"><span style={{color:'#4ade80'}}>✓</span> Фото готово</div>
           </div>
         )}
       </div>
 
+      {/* Status bar */}
       {!captured&&(
         <div className="status-bar">
-          <div className="status-pill" style={{borderColor:fi.dot==='#4ade80'?'rgba(74,222,128,.25)':'rgba(255,255,255,.06)'}}>
-            <div className="status-dot" style={{background:fi.dot}}/>
-            <span className="status-text" style={{color:fi.dot}}>{fi.text}</span>
-          </div>
-          <div className="status-pill" style={{borderColor:li.dot==='#4ade80'?'rgba(74,222,128,.25)':'rgba(255,255,255,.06)'}}>
-            <div className="status-dot" style={{background:li.dot}}/>
-            <span className="status-text" style={{color:li.dot}}>{li.text}</span>
-          </div>
+          {[
+            {info:fi,key:'face'},
+            {info:hi,key:'head'},
+            {info:li,key:'light'},
+          ].map(({info,key})=>(
+            <div key={key} className="status-pill"
+              style={{borderColor:info.dot==='#4ade80'?'rgba(74,222,128,.22)':'rgba(255,255,255,.06)'}}>
+              <div className="status-dot" style={{background:info.dot}}/>
+              <span className="status-text" style={{color:info.dot}}>{info.text}</span>
+            </div>
+          ))}
         </div>
       )}
 
+      {/* Controls */}
       <div className="controls">
         {!captured?(<>
-          <button className="flip-btn" onClick={handleFlip}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <button className="flip-btn" onClick={handleFlip} title="Переключить камеру">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M20 7h-9"/><path d="M14 17H5"/>
               <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
             </svg>
@@ -395,13 +669,16 @@ function App(){
           <button className={`capture-btn${isReady?' ready':''}`} onClick={capture}>
             <div className="capture-inner"/>
           </button>
-          <div className="spacer"/>
+          <button className={`bg-btn${bgRemove?' active':''}`} onClick={toggleBg} title="Замена фона">
+            🪄
+          </button>
         </>):(<>
           <button className="action-btn" onClick={()=>setCaptured(null)}>↩ Переснять</button>
           <button className="action-btn primary" onClick={download}>↓ Сохранить</button>
         </>)}
       </div>
 
+      {/* Requirements */}
       <div className="req-panel">
         <div className="req-title">ТРЕБОВАНИЯ ГОСТ Р 52425-2005</div>
         <div className="req-grid">
