@@ -6,16 +6,16 @@
 <meta name="theme-color" content="#0E0E12"/>
 <title>Фото на документы РФ</title>
 
-<!-- TensorFlow.js + BlazeFace for reliable cross-device face detection -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.17.0/dist/tf-core.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.17.0/dist/tf-backend-webgl.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/blazeface@0.0.7/dist/blazeface.min.js"></script>
 
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body,#root{height:100%;background:#0E0E12}
-body{overflow:hidden;-webkit-tap-highlight-color:transparent;font-family:'Courier New',monospace}
-button{cursor:pointer;font-family:'Courier New',monospace}
+html,body{height:100%;background:#0E0E12;overflow:hidden}
+body{font-family:'Courier New',monospace;-webkit-tap-highlight-color:transparent}
+button{cursor:pointer;font-family:inherit}
+button:active{opacity:.72}
 
 .app{
   height:100dvh;display:flex;flex-direction:column;
@@ -23,41 +23,47 @@ button{cursor:pointer;font-family:'Courier New',monospace}
   max-width:480px;margin:0 auto;
 }
 
-/* ── Header ── */
+/* header */
 .hdr{padding:9px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:#000;flex-shrink:0}
 .hdr-title{font-size:10px;letter-spacing:.16em;color:#F5C842;font-weight:bold;margin-bottom:7px}
 .pills{display:flex;gap:5px}
 .pill{background:transparent;border:1px solid rgba(232,213,163,.2);border-radius:3px;
-  color:rgba(232,213,163,.45);font-size:10px;padding:4px 10px;letter-spacing:.04em;transition:all .15s}
+  color:rgba(232,213,163,.45);font-size:10px;padding:4px 10px;letter-spacing:.04em}
 .pill.on{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 .sub{font-size:9px;color:rgba(232,213,163,.32);margin-top:4px;letter-spacing:.06em}
 
-/* ── Viewfinder ── */
-.vf{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
-canvas.live{width:100%;height:100%;object-fit:cover;display:block}
-.mirror{transform:scaleX(-1)}
-.svg-ov{position:absolute;inset:0;pointer-events:none}
+/* viewfinder — flex:1, canvas fills it */
+.vf{
+  flex:1;position:relative;background:#000;overflow:hidden;min-height:0;
+}
+#liveC{
+  position:absolute;inset:0;width:100%;height:100%;display:block;
+}
 
 /* hint */
 .hint{
   position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
-  background:rgba(0,0,0,.72);font-size:10px;padding:6px 16px;
-  border-radius:20px;white-space:nowrap;pointer-events:none;
-  border:1px solid rgba(232,213,163,.15);color:rgba(232,213,163,.8);
-  max-width:90%;text-align:center;transition:color .2s,border-color .2s;
-  letter-spacing:.05em;
+  background:rgba(0,0,0,.75);font-size:10px;padding:6px 16px;
+  border-radius:20px;pointer-events:none;white-space:nowrap;
+  border:1px solid rgba(232,213,163,.15);color:rgba(232,213,163,.82);
+  letter-spacing:.05em;max-width:92%;text-align:center;
+  transition:color .2s,border-color .2s;
 }
-.hint.ok  {color:#4ade80;border-color:rgba(74,222,128,.4)}
-.hint.warn{color:#fb923c;border-color:rgba(251,146,60,.35)}
+.hint.ok  {color:#4ade80;border-color:rgba(74,222,128,.42)}
+.hint.warn{color:#fb923c;border-color:rgba(251,146,60,.38)}
 
 /* flash */
-.flash{position:absolute;inset:0;background:#fff;z-index:10;
-  animation:fl .22s forwards;pointer-events:none}
+.flash{
+  position:absolute;inset:0;background:#fff;z-index:10;
+  animation:fl .22s forwards;pointer-events:none;
+}
 @keyframes fl{to{opacity:0}}
 
 /* processing */
-.proc{position:absolute;inset:0;background:rgba(0,0,0,.9);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20}
+.proc{
+  position:absolute;inset:0;background:rgba(0,0,0,.9);z-index:20;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+}
 .spin{width:36px;height:36px;border:3px solid rgba(245,200,66,.15);
   border-top-color:#F5C842;border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -65,52 +71,71 @@ canvas.live{width:100%;height:100%;object-fit:cover;display:block}
 .proc small{font-size:9px;color:rgba(232,213,163,.4);letter-spacing:.07em}
 
 /* cam error */
-.err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:14px;padding:28px;background:rgba(0,0,0,.9);
-  color:#E8D5A3;font-size:13px;text-align:center;line-height:1.6}
-.err i{font-size:36px;font-style:normal}
+.cam-err{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;padding:28px;
+  background:rgba(0,0,0,.9);color:#E8D5A3;font-size:13px;
+  text-align:center;line-height:1.6;
+}
 
-/* preview after capture */
-.prev{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#111}
-.prev img{max-width:100%;max-height:100%;object-fit:contain;display:block}
-.prev-badge{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.75);
-  border:1px solid #4ade80;border-radius:4px;padding:4px 10px;font-size:10px;color:#fff;letter-spacing:.05em}
+/* preview */
+.prev-wrap{
+  position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;background:#111;z-index:5;
+}
+.prev-wrap img{max-width:100%;max-height:100%;object-fit:contain}
+.prev-badge{
+  position:absolute;top:10px;right:10px;background:rgba(0,0,0,.8);
+  border:1px solid #4ade80;border-radius:4px;padding:4px 10px;
+  font-size:10px;color:#fff;letter-spacing:.05em;
+}
 
-/* ── Status bar ── */
-.sbar{display:flex;gap:4px;padding:5px 8px;background:rgba(0,0,0,.5);
-  border-top:1px solid rgba(232,213,163,.08);flex-shrink:0}
-.sp{flex:1;display:flex;align-items:center;gap:4px;padding:4px 7px;border-radius:3px;
-  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);
-  overflow:hidden;font-size:8.5px;letter-spacing:.04em}
-.sd{width:6px;height:6px;border-radius:50%;flex-shrink:0;transition:background .25s}
-.st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .25s}
-
-/* model loading bar */
-.mbar{height:2px;background:rgba(245,200,66,.15);flex-shrink:0;position:relative;overflow:hidden}
-.mbar-inner{height:100%;background:#F5C842;animation:mb 1.4s ease-in-out infinite}
+/* model loading indicator */
+.mbar{height:2px;background:rgba(245,200,66,.12);flex-shrink:0;overflow:hidden}
+.mbar-fill{height:100%;background:#F5C842;animation:mb 1.4s ease-in-out infinite}
 @keyframes mb{0%{width:0;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0;margin-left:100%}}
 
-/* ── Controls ── */
-.ctrl{display:flex;align-items:center;justify-content:space-around;
-  padding:12px 24px;background:#0E0E12;border-top:1px solid rgba(232,213,163,.08);
-  gap:10px;flex-shrink:0}
-.cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;
+/* status bar */
+.sbar{display:flex;gap:4px;padding:5px 8px;background:rgba(0,0,0,.5);
+  border-top:1px solid rgba(232,213,163,.08);flex-shrink:0}
+.sp{flex:1;min-width:0;display:flex;align-items:center;gap:4px;
+  padding:4px 6px;border-radius:3px;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.07);font-size:8.5px;letter-spacing:.04em}
+.sd{width:6px;height:6px;min-width:6px;border-radius:50%;transition:background .25s}
+.st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .25s}
+
+/* controls */
+.ctrl{
+  display:flex;align-items:center;justify-content:space-around;
+  padding:12px 24px;background:#0E0E12;
+  border-top:1px solid rgba(232,213,163,.08);gap:10px;flex-shrink:0;
+}
+.cbtn{
+  width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;
   background:transparent;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;box-shadow:0 0 16px rgba(245,200,66,.15);transition:border-color .25s,box-shadow .25s}
+  flex-shrink:0;box-shadow:0 0 14px rgba(245,200,66,.14);transition:border-color .25s,box-shadow .25s;
+}
 .cbtn.rdy{border-color:#4ade80;animation:rp 1.6s ease-in-out infinite}
-@keyframes rp{0%,100%{box-shadow:0 0 16px rgba(74,222,128,.2)}50%{box-shadow:0 0 28px rgba(74,222,128,.55)}}
+@keyframes rp{0%,100%{box-shadow:0 0 14px rgba(74,222,128,.2)}50%{box-shadow:0 0 28px rgba(74,222,128,.55)}}
 .cbtn:active{transform:scale(.93)}
-.ci{width:48px;height:48px;border-radius:50%;background:#F5C842;transition:background .25s}
+.ci{width:48px;height:48px;border-radius:50%;background:#F5C842;transition:background .25s;pointer-events:none}
 .cbtn.rdy .ci{background:#4ade80}
-.icobtn{width:42px;height:42px;border-radius:50%;border:1px solid rgba(232,213,163,.2);
-  background:rgba(232,213,163,.04);color:#E8D5A3;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.icobtn.on{border-color:#60a5fa;background:rgba(96,165,250,.1);color:#60a5fa}
-.abtn{flex:1;padding:11px 0;background:transparent;border:1px solid rgba(232,213,163,.25);
-  color:#E8D5A3;border-radius:4px;font-size:11px;letter-spacing:.1em}
+.icobtn{
+  width:42px;height:42px;border-radius:50%;border:1px solid rgba(232,213,163,.2);
+  background:rgba(232,213,163,.04);color:#E8D5A3;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;
+}
+.icobtn.on{border-color:#60a5fa;background:rgba(96,165,250,.1)}
+.abtn{
+  flex:1;padding:11px 0;background:transparent;
+  border:1px solid rgba(232,213,163,.25);color:#E8D5A3;
+  border-radius:4px;font-size:11px;letter-spacing:.1em;
+}
 .abtn.p{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 
-/* ── Req panel ── */
-.req{padding:7px 14px 10px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.25);flex-shrink:0}
+/* requirements */
+.req{padding:7px 14px 10px;border-top:1px solid rgba(232,213,163,.07);
+  background:rgba(0,0,0,.25);flex-shrink:0}
 .req h4{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.28);margin-bottom:5px}
 .req-g{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
 .ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;
@@ -121,152 +146,579 @@ canvas.live{width:100%;height:100%;object-fit:cover;display:block}
 </head>
 <body>
 <div id="root"></div>
-
 <script>
-// ═══════════════════════════════════════════════════════
-// Constants
-// ═══════════════════════════════════════════════════════
+'use strict';
+
+// ── Config ──────────────────────────────────────────────────────────
 const TYPES = {
   passport:{ label:'Паспорт / Загран', size:'35×45 мм', aspect:35/45, desc:'Загранпаспорт, ВНЖ, СНИЛС' },
   visa:    { label:'Виза',             size:'35×45 мм', aspect:35/45, desc:'Шенген, US, UK, Китай' },
   zagran:  { label:'Воен. билет',      size:'30×40 мм', aspect:30/40, desc:'Военный билет, приписное' },
 };
 const REQS = [
-  ['Размер', null], ['Лицо','70–80% высоты'],
-  ['Фон','белый / светло-серый'], ['Взгляд','прямо в объектив'],
-  ['Выражение','нейтральное'], ['Качество','без теней, резкое'],
+  ['Размер',null],['Лицо','70–80% высоты'],
+  ['Фон','белый / светло-серый'],['Взгляд','прямо в объектив'],
+  ['Выражение','нейтральное'],['Качество','без теней, резкое'],
 ];
-const FG = { cy:.47, oh:.74, ow:.54, ey:.55, cy2:.85, cy3:.11 };
 
-// ═══════════════════════════════════════════════════════
-// Face analysis (BlazeFace returns 6 keypoints:
-//   0=rightEye 1=leftEye 2=nose 3=mouth 4=rightEar 5=leftEar)
-// ═══════════════════════════════════════════════════════
-function analyzeFace(pred, vw, vh) {
-  const [x1,y1] = pred.topLeft;
-  const [x2,y2] = pred.bottomRight;
-  const fw = x2-x1, fh = y2-y1;
-  const cx = (x1+x2)/2/vw, cy = (y1+y2)/2/vh;
-  const nh = fh/vh;
+// Face frame proportions
+const FR = { ovalCY:.47, ovalH:.74, ovalW:.54, eyeY:.55, chinY:.85, crownY:.11 };
 
-  const result = { pos:'ok', head:'ok' };
+// ── State ───────────────────────────────────────────────────────────
+const S = {
+  type:'passport', facing:'user', captured:null,
+  faceStatus:'init', headStatus:'init', lightStatus:'init',
+  bgRemove:false, modelReady:false,
+};
 
-  // Position
-  if (nh < 0.30) { result.pos = 'too_far'; }
-  else if (nh > 0.82) { result.pos = 'too_close'; }
-  else if (Math.abs(cx-.50) > .15 || Math.abs(cy-.47) > .16) { result.pos = 'off_center'; }
+// ── DOM refs ────────────────────────────────────────────────────────
+let liveCanvas, captureCanvas, hintEl;
+let video, stream;
+let blazeModel = null;
+let rafId = null, analyzeTimer = null;
 
-  // Head pose from landmarks
-  const lm = pred.landmarks; // shape [6,2]
-  if (lm && lm.length >= 4) {
-    const re = lm[0], le = lm[1], nose = lm[2], mouth = lm[3];
-    // Roll: angle between eyes (positive = right eye higher)
-    const dx = le[0]-re[0], dy = le[1]-re[1];
-    const roll = Math.atan2(dy, dx) * 180/Math.PI;
-    if (roll > 8)       { result.head = 'tilt_right'; }
-    else if (roll < -8) { result.head = 'tilt_left'; }
-    else {
-      // Yaw: nose offset from eye midpoint, normalised by face width
-      const eyeMidX = (re[0]+le[0])/2;
-      const nOff = (nose[0]-eyeMidX)/fw;
-      if      (nOff >  0.08) { result.head = 'turn_right'; }
-      else if (nOff < -0.08) { result.head = 'turn_left'; }
-      else {
-        // Pitch: distance eye-mid to nose vs nose to mouth
-        const eyeMidY = (re[1]+le[1])/2;
-        const e2n = (nose[1]-eyeMidY)/fh;
-        const n2m = (mouth[1]-nose[1])/fh;
-        if      (e2n < 0.18 || n2m > 0.40) { result.head = 'look_up'; }
-        else if (e2n > 0.42 || n2m < 0.12) { result.head = 'look_down'; }
-      }
+// ── App boot ────────────────────────────────────────────────────────
+function boot() {
+  document.getElementById('root').innerHTML = buildShell();
+  liveCanvas    = document.getElementById('liveC');
+  captureCanvas = document.createElement('canvas');
+  hintEl        = document.getElementById('hintEl');
+  video         = document.createElement('video');
+  video.autoplay = true; video.playsInline = true; video.muted = true;
+
+  startCamera();
+  loadModel();
+}
+
+// ── Shell (static structure, not re-rendered) ───────────────────────
+function buildShell() {
+  const t = TYPES[S.type];
+  return `
+<div class="app">
+  <div class="hdr">
+    <div class="hdr-title">⊞ ФОТО НА ДОКУМЕНТЫ РФ</div>
+    <div class="pills" id="pills">
+      ${Object.entries(TYPES).map(([k,v])=>
+        `<button class="pill${S.type===k?' on':''}" onclick="setType('${k}')">${v.label}</button>`
+      ).join('')}
+    </div>
+    <div class="sub" id="subDesc">${t.size} · ${t.desc}</div>
+  </div>
+
+  <div class="vf" id="vf">
+    <canvas id="liveC"></canvas>
+    <div id="hintEl" class="hint">Инициализация...</div>
+  </div>
+
+  <div id="mbar" class="mbar"><div class="mbar-fill"></div></div>
+
+  <div class="sbar" id="sbar">
+    ${pill('face','init')}${pill('head','init')}${pill('light','init')}
+  </div>
+
+  <div class="ctrl" id="ctrl">
+    <button class="icobtn" id="flipBtn" onclick="flipCam()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 7h-9"/><path d="M14 17H5"/>
+        <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
+      </svg>
+    </button>
+    <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
+    <button class="icobtn" id="bgBtn" onclick="toggleBg()" title="Замена фона на белый при съёмке">🪄</button>
+  </div>
+
+  <div class="req">
+    <h4>ТРЕБОВАНИЯ ГОСТ Р 52425-2005</h4>
+    <div class="req-g" id="reqGrid"></div>
+  </div>
+</div>`;
+}
+
+function updateReqGrid() {
+  const g = document.getElementById('reqGrid');
+  if (!g) return;
+  const t = TYPES[S.type];
+  g.innerHTML = REQS.map(([k,v])=>
+    `<div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>`
+  ).join('');
+}
+
+// ── Camera ──────────────────────────────────────────────────────────
+async function startCamera() {
+  cancelAnimationFrame(rafId);
+  clearTimeout(analyzeTimer);
+  if (stream) stream.getTracks().forEach(t=>t.stop());
+  S.faceStatus='init'; S.headStatus='init'; S.lightStatus='init';
+  updateSbar(); updateHint();
+
+  // Hide preview if showing
+  const pw = document.getElementById('prevWrap');
+  if (pw) pw.remove();
+  S.captured = null;
+  showCaptureControls();
+
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:S.facing, width:{ideal:1920}, height:{ideal:1080} },
+      audio:false,
+    });
+    video.srcObject = stream;
+    video.addEventListener('loadedmetadata', onVideoReady, {once:true});
+  } catch(e) {
+    showError('Нет доступа к камере.<br>Разрешите камеру в настройках браузера.');
+  }
+}
+
+function onVideoReady() {
+  startRender();
+  scheduleAnalyze(1000);
+  updateReqGrid();
+}
+
+// ── Render loop — draws video + overlay on one canvas ───────────────
+function startRender() {
+  const vf = document.getElementById('vf');
+
+  function frame() {
+    if (!liveCanvas || !video || video.readyState < 2) {
+      rafId = requestAnimationFrame(frame); return;
     }
+
+    // Match canvas pixel size to CSS display size
+    const W = vf.clientWidth;
+    const H = vf.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    const PW = Math.round(W * dpr);
+    const PH = Math.round(H * dpr);
+    if (liveCanvas.width !== PW || liveCanvas.height !== PH) {
+      liveCanvas.width  = PW;
+      liveCanvas.height = PH;
+      liveCanvas.style.width  = W + 'px';
+      liveCanvas.style.height = H + 'px';
+    }
+
+    const ctx = liveCanvas.getContext('2d');
+
+    // Draw video (cover-fit)
+    const vw = video.videoWidth, vh = video.videoHeight;
+    if (!vw || !vh) { rafId = requestAnimationFrame(frame); return; }
+
+    const scale = Math.max(PW/vw, PH/vh);
+    const dw = vw*scale, dh = vh*scale;
+    const dx = (PW-dw)/2, dy = (PH-dh)/2;
+
+    // Mirror front camera
+    if (S.facing === 'user') {
+      ctx.save();
+      ctx.translate(PW, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, dx, dy, dw, dh);
+      ctx.restore();
+    } else {
+      ctx.drawImage(video, dx, dy, dw, dh);
+    }
+
+    // Draw overlay on top
+    drawOverlay(ctx, PW, PH);
+
+    rafId = requestAnimationFrame(frame);
   }
-  return result;
+  rafId = requestAnimationFrame(frame);
 }
 
-function analyzeBrightness(video) {
-  const W=64, H=48;
-  const c = document.createElement('canvas');
-  c.width=W; c.height=H;
-  const ctx = c.getContext('2d');
-  ctx.drawImage(video, video.videoWidth*.25, video.videoHeight*.15, video.videoWidth*.5, video.videoHeight*.7, 0,0,W,H);
-  const d = ctx.getImageData(0,0,W,H).data;
-  let sum=0, lSum=0, rSum=0;
-  const n=W*H;
-  for (let i=0;i<n;i++) {
-    const idx=i*4, b=.299*d[idx]+.587*d[idx+1]+.114*d[idx+2];
-    sum+=b;
-    if(i%W < W/2) lSum+=b; else rSum+=b;
+// ── Overlay drawn directly on canvas ────────────────────────────────
+function drawOverlay(ctx, W, H) {
+  const { aspect, size } = TYPES[S.type];
+
+  // Frame dimensions
+  let fH = H * 0.83, fW = fH * aspect;
+  if (fW > W * 0.78) { fW = W * 0.78; fH = fW / aspect; }
+  const fX = (W - fW) / 2, fY = (H - fH) / 2;
+
+  // Darken outside frame
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.52)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.clearRect(fX, fY, fW, fH);  // punch hole
+  ctx.restore();
+
+  // Redraw video inside frame (hole is transparent, we need to clip & redraw)
+  // Actually easier: draw vignette as 4 dark rects around frame
+  ctx.fillStyle = 'rgba(0,0,0,0.52)';
+  ctx.fillRect(0, 0, W, fY);                          // top
+  ctx.fillRect(0, fY+fH, W, H-(fY+fH));              // bottom
+  ctx.fillRect(0, fY, fX, fH);                        // left
+  ctx.fillRect(fX+fW, fY, W-(fX+fW), fH);            // right
+
+  // The above approach won't work cleanly. Let's use compositing properly:
+  // We'll just draw semi-transparent rects over the 4 sides.
+  // The frame interior is untouched (shows video).
+
+  // Frame border
+  ctx.strokeStyle = 'rgba(232,213,163,0.55)';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(fX, fY, fW, fH);
+
+  // Determine colours based on status
+  const allOk = S.faceStatus==='ok' && (S.headStatus==='ok'||S.headStatus==='na');
+  const anyWarn = S.faceStatus!=='ok' && S.faceStatus!=='init';
+  const cornerColor = allOk ? '#4ade80' : '#F5C842';
+  const ovalColor   = allOk ? 'rgba(74,222,128,0.85)'
+                    : anyWarn ? 'rgba(249,115,22,0.8)'
+                    : 'rgba(245,200,66,0.55)';
+
+  // Corner accents
+  const L = 18;
+  const corners = [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
+  ctx.strokeStyle = cornerColor;
+  ctx.lineWidth = 2.5 * (window.devicePixelRatio||1) * 0.5;
+  ctx.lineCap = 'round';
+  for (const [cx,cy,dx,dy] of corners) {
+    ctx.beginPath(); ctx.moveTo(cx+dx*L,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+dy*L);
+    ctx.stroke();
   }
-  const avg=sum/n;
-  return { avg, evenness: avg>0 ? Math.abs(lSum-rSum)/(avg*n) : 0 };
+
+  // Face oval
+  const oCX = fX + fW/2;
+  const oCY = fY + fH * FR.ovalCY;
+  const oRX = fW * FR.ovalW / 2;
+  const oRY = fH * FR.ovalH / 2;
+  ctx.strokeStyle = ovalColor;
+  ctx.lineWidth = 1.8;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  ctx.ellipse(oCX, oCY, oRX, oRY, 0, 0, Math.PI*2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Guide lines
+  const dpr = window.devicePixelRatio || 1;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,5]);
+
+  const eyeY   = fY + fH * FR.eyeY;
+  const crownY = fY + fH * FR.crownY;
+  const chinY  = fY + fH * FR.chinY;
+
+  ctx.strokeStyle = 'rgba(245,200,66,0.3)';
+  ctx.beginPath(); ctx.moveTo(fX+fW*.28,crownY); ctx.lineTo(fX+fW*.72,crownY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(fX+fW*.28,chinY);  ctx.lineTo(fX+fW*.72,chinY);  ctx.stroke();
+  ctx.strokeStyle = 'rgba(100,200,255,0.3)';
+  ctx.beginPath(); ctx.moveTo(fX+fW*.18,eyeY);   ctx.lineTo(fX+fW*.82,eyeY);   ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Labels (right side if room)
+  const lblX = fX + fW + 8;
+  const room = W - (fX + fW) > 36;
+  ctx.font = `${Math.round(9*dpr*0.6)}px monospace`;
+  ctx.fillStyle = 'rgba(245,200,66,0.6)';
+  if (room) {
+    ctx.fillText('темя',  lblX, crownY+4);
+    ctx.fillText('подб.', lblX, chinY+4);
+    ctx.fillStyle = 'rgba(100,200,255,0.6)';
+    ctx.fillText('глаза', lblX, eyeY+4);
+  }
+
+  // Size label above frame
+  ctx.fillStyle = 'rgba(232,213,163,0.65)';
+  ctx.font = `${Math.round(10*dpr*0.6)}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText(size, fX + fW/2, fY - 8);
+  ctx.textAlign = 'left';
 }
 
-// ═══════════════════════════════════════════════════════
-// Background removal: edge flood-fill + refinement
-// ═══════════════════════════════════════════════════════
-function removeBackground(ctx, w, h) {
-  const imgData = ctx.getImageData(0,0,w,h);
-  const d = imgData.data;
-  const thr = 55;
+// ── BlazeFace model ──────────────────────────────────────────────────
+async function loadModel() {
+  try {
+    await tf.setBackend('webgl');
+    await tf.ready();
+    blazeModel = await blazeface.load();
+    S.modelReady = true;
+    const mb = document.getElementById('mbar');
+    if (mb) mb.remove();
+  } catch(e) {
+    console.warn('BlazeFace:', e);
+    S.modelReady = false;
+    S.faceStatus = 'na'; S.headStatus = 'na';
+    updateSbar(); updateHint();
+    const mb = document.getElementById('mbar');
+    if (mb) mb.remove();
+  }
+}
 
-  // Sample bg from edges (top/left/right strips + bottom corners)
+// ── Analysis ─────────────────────────────────────────────────────────
+function scheduleAnalyze(delay) {
+  clearTimeout(analyzeTimer);
+  analyzeTimer = setTimeout(runAnalysis, delay || 700);
+}
+
+async function runAnalysis() {
+  if (S.captured) return;
+  if (!video || video.readyState < 2 || !video.videoWidth) { scheduleAnalyze(500); return; }
+
+  // Brightness
+  try {
+    const W=64, H=48;
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const ctx=c.getContext('2d');
+    ctx.drawImage(video, video.videoWidth*.25, video.videoHeight*.15,
+                  video.videoWidth*.5, video.videoHeight*.7, 0,0,W,H);
+    const d=ctx.getImageData(0,0,W,H).data;
+    let sum=0,lSum=0,rSum=0;
+    for (let i=0;i<W*H;i++) {
+      const b=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+      sum+=b; (i%W<W/2?lSum:rSum)+=b;
+    }
+    const avg=sum/(W*H), even=avg>0?Math.abs(lSum-rSum)/(avg*W*H):0;
+    if(avg<72)        S.lightStatus='dark';
+    else if(avg>228)  S.lightStatus='bright';
+    else if(even>.3)  S.lightStatus='uneven';
+    else              S.lightStatus='ok';
+  } catch{ S.lightStatus='ok'; }
+
+  // Face + head
+  if (blazeModel) {
+    try {
+      const preds = await blazeModel.estimateFaces(video, false);
+      if (preds.length) {
+        const p=preds[0], vw=video.videoWidth, vh=video.videoHeight;
+        const [x1,y1]=p.topLeft, [x2,y2]=p.bottomRight;
+        const fw=x2-x1, fh=y2-y1;
+        const cx=(x1+x2)/2/vw, cy=(y1+y2)/2/vh;
+        const nh=fh/vh;
+
+        // Position
+        if      (nh<.30)             S.faceStatus='far';
+        else if (nh>.82)             S.faceStatus='close';
+        else if (Math.abs(cx-.5)>.15||Math.abs(cy-.47)>.16) S.faceStatus='center';
+        else                         S.faceStatus='ok';
+
+        // Head pose from landmarks [re,le,nose,mouth,rEar,lEar]
+        const lm=p.landmarks;
+        if (lm && lm.length>=4) {
+          const re=lm[0],le=lm[1],nose=lm[2],mouth=lm[3];
+          const roll=Math.atan2(le[1]-re[1], le[0]-re[0])*180/Math.PI;
+          if      (roll>9)   S.headStatus='tilt_r';
+          else if (roll<-9)  S.headStatus='tilt_l';
+          else {
+            const eyeMX=(re[0]+le[0])/2, eyeMY=(re[1]+le[1])/2;
+            const yaw=(nose[0]-eyeMX)/fw;
+            if      (yaw>.09)  S.headStatus='turn_r';
+            else if (yaw<-.09) S.headStatus='turn_l';
+            else {
+              const e2n=(nose[1]-eyeMY)/fh;
+              const n2m=(mouth[1]-nose[1])/fh;
+              if      (e2n<.18||n2m>.40) S.headStatus='up';
+              else if (e2n>.43||n2m<.11) S.headStatus='down';
+              else                       S.headStatus='ok';
+            }
+          }
+        } else { S.headStatus='na'; }
+      } else {
+        S.faceStatus='none'; S.headStatus='na';
+      }
+    } catch { S.faceStatus='ok'; S.headStatus='na'; }
+  } else if (!S.modelReady) {
+    if (S.faceStatus==='init') { S.faceStatus='na'; S.headStatus='na'; }
+  }
+
+  updateSbar();
+  updateHint();
+  scheduleAnalyze(700);
+}
+
+// ── Status bar ────────────────────────────────────────────────────────
+const PCFG = {
+  face:{
+    init:['#666','Инициализация...'],
+    na:  ['#888','Позиция — вручную'],
+    none:['#ef4444','Лицо не найдено'],
+    close:['#f97316','Отойдите дальше'],
+    far:  ['#f97316','Подойдите ближе'],
+    center:['#f97316','Выровняйте центр'],
+    ok:  ['#4ade80','Позиция ✓'],
+  },
+  head:{
+    init:   ['#666','Анализ...'],
+    na:     ['#888','Голова — вручную'],
+    tilt_l: ['#f97316','Наклон влево'],
+    tilt_r: ['#f97316','Наклон вправо'],
+    turn_l: ['#f97316','Повернитесь вправо'],
+    turn_r: ['#f97316','Повернитесь влево'],
+    up:     ['#f97316','Опустите подбородок'],
+    down:   ['#f97316','Поднимите подбородок'],
+    ok:     ['#4ade80','Голова ✓'],
+  },
+  light:{
+    init:   ['#666','Анализ...'],
+    dark:   ['#ef4444','Слишком темно'],
+    bright: ['#f97316','Слишком ярко'],
+    uneven: ['#f97316','Неравный свет'],
+    ok:     ['#4ade80','Свет ✓'],
+  },
+};
+
+function pill(type, status) {
+  const cfg=PCFG[type]; const [dot,text]=(cfg[status]||cfg.init);
+  const bc=dot==='#4ade80'?'rgba(74,222,128,.22)':'rgba(255,255,255,.07)';
+  return `<div class="sp" style="border-color:${bc}">
+    <div class="sd" style="background:${dot}"></div>
+    <span class="st" style="color:${dot}">${text}</span>
+  </div>`;
+}
+
+function updateSbar() {
+  const sb=document.getElementById('sbar');
+  if(sb) sb.innerHTML=pill('face',S.faceStatus)+pill('head',S.headStatus)+pill('light',S.lightStatus);
+}
+
+function isReady() {
+  return S.faceStatus==='ok'
+    && (S.headStatus==='ok'||S.headStatus==='na')
+    && S.lightStatus==='ok';
+}
+
+function updateHint() {
+  if(!hintEl) return;
+  const f=S.faceStatus, h=S.headStatus, l=S.lightStatus;
+  let txt='', cls='';
+  if(f==='init')          txt='Инициализация...';
+  else if(f==='none')   { txt='Встаньте перед камерой'; cls='warn'; }
+  else if(f==='close')  { txt='Отойдите дальше'; cls='warn'; }
+  else if(f==='far')    { txt='Подойдите ближе'; cls='warn'; }
+  else if(f==='center') { txt='Выровняйте лицо по центру'; cls='warn'; }
+  else if(h==='tilt_l') { txt='Наклоните голову вправо'; cls='warn'; }
+  else if(h==='tilt_r') { txt='Наклоните голову влево'; cls='warn'; }
+  else if(h==='turn_l') { txt='Повернитесь правее'; cls='warn'; }
+  else if(h==='turn_r') { txt='Повернитесь левее'; cls='warn'; }
+  else if(h==='up')     { txt='Опустите подбородок'; cls='warn'; }
+  else if(h==='down')   { txt='Поднимите подбородок'; cls='warn'; }
+  else if(l==='dark')   { txt='Добавьте освещения'; cls='warn'; }
+  else if(l==='bright') { txt='Уменьшите яркость'; cls='warn'; }
+  else if(l==='uneven') { txt='Нужен свет с обеих сторон'; cls='warn'; }
+  else if(isReady())    { txt='✓ Готово — нажмите кнопку'; cls='ok'; }
+  else                    txt='Совместите лицо с овалом';
+  hintEl.textContent=txt;
+  hintEl.className='hint'+(cls?' '+cls:'');
+  const cb=document.getElementById('capBtn');
+  if(cb) cb.className='cbtn'+(isReady()?' rdy':'');
+}
+
+// ── Capture ───────────────────────────────────────────────────────────
+async function doCapture() {
+  if(!video||video.readyState<2) return;
+
+  // Flash
+  const vf=document.getElementById('vf');
+  const fl=document.createElement('div'); fl.className='flash';
+  vf.appendChild(fl); setTimeout(()=>fl.remove(),300);
+
+  // Show processing overlay
+  const po=document.createElement('div'); po.className='proc';
+  po.innerHTML=`<div class="spin"></div><p>ОБРАБОТКА</p>
+    <small>${S.bgRemove?'удаление фона · ':''}коррекция света</small>`;
+  vf.appendChild(po);
+
+  await new Promise(r=>setTimeout(r,80));
+
+  // Crop video to document aspect ratio
+  const { aspect } = TYPES[S.type];
+  const vw=video.videoWidth, vh=video.videoHeight;
+  let cW, cH;
+  if (vw/vh > aspect) { cH=vh; cW=Math.round(vh*aspect); }
+  else                { cW=vw; cH=Math.round(vw/aspect); }
+  const srcX=Math.round((vw-cW)/2);
+  const srcY=Math.round((vh-cH)/2);
+
+  captureCanvas.width=cW; captureCanvas.height=cH;
+  const ctx=captureCanvas.getContext('2d');
+
+  if (S.facing==='user') {
+    ctx.translate(cW,0); ctx.scale(-1,1);
+    ctx.drawImage(video, srcX, srcY, cW, cH, 0, 0, cW, cH);
+    ctx.setTransform(1,0,0,1,0,0);
+  } else {
+    ctx.drawImage(video, srcX, srcY, cW, cH, 0, 0, cW, cH);
+  }
+
+  // Post-process
+  try {
+    if (S.bgRemove) removeBg(ctx, cW, cH);
+    smoothLight(ctx, cW, cH);
+  } catch(e) { console.warn(e); }
+
+  S.captured = captureCanvas.toDataURL('image/jpeg', 0.95);
+
+  // Stop camera
+  cancelAnimationFrame(rafId);
+  clearTimeout(analyzeTimer);
+
+  // Show preview
+  po.remove();
+  vf.innerHTML=''; // clear canvas etc
+  vf.insertAdjacentHTML('beforeend',
+    `<div class="prev-wrap" id="prevWrap">
+      <img src="${S.captured}" alt="preview"/>
+      <div class="prev-badge">✓ Фото готово</div>
+    </div>`);
+  showPreviewControls();
+}
+
+// ── Background removal (flood-fill from edges) ────────────────────────
+function removeBg(ctx, w, h) {
+  const imgData=ctx.getImageData(0,0,w,h);
+  const d=imgData.data;
+
+  // Sample bg colour from 4 edge strips
   let rS=0,gS=0,bS=0,cnt=0;
-  const addPx = (px,py) => {
-    const i=(py*w+px)*4;
-    rS+=d[i]; gS+=d[i+1]; bS+=d[i+2]; cnt++;
-  };
-  const strip = 4;
-  for(let x=0;x<w;x++) { addPx(x,0);addPx(x,1); }
-  for(let y=0;y<h;y++) { addPx(0,y);addPx(1,y);addPx(w-1,y);addPx(w-2,y); }
-  for(let x=0;x<w;x++) { addPx(x,h-1);addPx(x,h-2); }
-  const bgR=rS/cnt, bgG=gS/cnt, bgB=bS/cnt;
+  const s=3;
+  for(let x=0;x<w;x++)  { for(let row=0;row<s;row++)   addSmp(x,row);
+                           for(let row=h-s;row<h;row++) addSmp(x,row); }
+  for(let y=s;y<h-s;y++) { for(let col=0;col<s;col++)   addSmp(col,y);
+                            for(let col=w-s;col<w;col++) addSmp(col,y); }
+  function addSmp(x,y){ const i=(y*w+x)*4; rS+=d[i];gS+=d[i+1];bS+=d[i+2];cnt++; }
+  const bgR=rS/cnt, bgG=gS/cnt, bgB=bS/cnt, thr=62;
 
-  // Flood fill from every edge pixel
-  const visited = new Uint8Array(w*h);
-  const queue = [];
+  // BFS flood-fill from all edge pixels
+  const visited=new Uint8Array(w*h);
+  const q=[];
+  function enq(x,y){
+    if(x<0||x>=w||y<0||y>=h)return;
+    const idx=y*w+x; if(visited[idx])return; visited[idx]=1;
+    const i=idx*4;
+    const dr=d[i]-bgR,dg=d[i+1]-bgG,db=d[i+2]-bgB;
+    if(Math.sqrt(dr*dr+dg*dg+db*db)<thr) q.push(idx);
+  }
+  for(let x=0;x<w;x++){enq(x,0);enq(x,h-1);}
+  for(let y=1;y<h-1;y++){enq(0,y);enq(w-1,y);}
 
-  const isBackground = (i) => {
-    const dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
-    return Math.sqrt(dr*dr+dg*dg+db*db) < thr;
-  };
-  const enqueue = (x,y) => {
-    if(x<0||x>=w||y<0||y>=h) return;
-    const idx=y*w+x;
-    if(visited[idx]) return;
-    visited[idx]=1;
-    if(isBackground(idx*4)) queue.push(idx);
-  };
-  for(let x=0;x<w;x++){enqueue(x,0);enqueue(x,h-1);}
-  for(let y=0;y<h;y++){enqueue(0,y);enqueue(w-1,y);}
-
-  while(queue.length) {
-    const idx=queue.pop();
-    const x=idx%w, y=Math.floor(idx/w);
+  while(q.length){
+    const idx=q.pop();
     d[idx*4]=255; d[idx*4+1]=255; d[idx*4+2]=255;
-    enqueue(x+1,y);enqueue(x-1,y);enqueue(x,y+1);enqueue(x,y-1);
+    const x=idx%w, y=(idx/w)|0;
+    enq(x+1,y);enq(x-1,y);enq(x,y+1);enq(x,y-1);
   }
   ctx.putImageData(imgData,0,0);
 }
 
-// Normalise face brightness
+// ── Light normalisation ───────────────────────────────────────────────
 function smoothLight(ctx, w, h) {
-  const imgData = ctx.getImageData(0,0,w,h);
-  const d = imgData.data;
-  const fx=Math.floor(w*.18),fy=Math.floor(h*.05),fw2=Math.floor(w*.64),fh2=Math.floor(h*.78);
+  const imgData=ctx.getImageData(0,0,w,h);
+  const d=imgData.data;
+  const fx=w*.18|0, fy=h*.05|0, fw=(w*.64)|0, fh=(h*.78)|0;
   let sum=0,cnt=0;
-  for(let y=fy;y<Math.min(fy+fh2,h);y++)
-    for(let x=fx;x<Math.min(fx+fw2,w);x++){
+  for(let y=fy;y<Math.min(fy+fh,h);y++)
+    for(let x=fx;x<Math.min(fx+fw,w);x++){
       const i=(y*w+x)*4;
       if(d[i]>250&&d[i+1]>250&&d[i+2]>250) continue;
       sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2]; cnt++;
     }
-  if(!cnt) return;
-  const mult = 158/(sum/cnt);
+  if(!cnt||sum===0) return;
+  const mult=158/(sum/cnt);
   if(Math.abs(mult-1)<.06) return;
-  const cl = v=>Math.max(0,Math.min(255,v|0));
-  for(let y=fy;y<Math.min(fy+fh2,h);y++)
-    for(let x=fx;x<Math.min(fx+fw2,w);x++){
+  const cl=v=>Math.max(0,Math.min(255,v|0));
+  for(let y=fy;y<Math.min(fy+fh,h);y++)
+    for(let x=fx;x<Math.min(fx+fw,w);x++){
       const i=(y*w+x)*4;
       if(d[i]>250&&d[i+1]>250&&d[i+2]>250) continue;
       d[i]=cl(d[i]*mult); d[i+1]=cl(d[i+1]*mult); d[i+2]=cl(d[i+2]*mult);
@@ -274,444 +726,89 @@ function smoothLight(ctx, w, h) {
   ctx.putImageData(imgData,0,0);
 }
 
-// ═══════════════════════════════════════════════════════
-// SVG overlay
-// ═══════════════════════════════════════════════════════
-function buildOverlay(w, h, typeKey, faceOk, headOk) {
-  const { aspect, size } = TYPES[typeKey];
-  let fH = h*.83, fW = fH*aspect;
-  if(fW > w*.80) { fW=w*.80; fH=fW/aspect; }
-  const fX=(w-fW)/2, fY=(h-fH)/2;
-  const oCX=fX+fW/2, oCY=fY+fH*FG.cy;
-  const oW=fW*FG.ow, oH=fH*FG.oh;
-  const eY=fY+fH*FG.ey, crY=fY+fH*FG.cy3, chY=fY+fH*FG.cy2;
-
-  const allOk = faceOk==='ok' && (headOk==='ok'||headOk==='n/a');
-  const ovalC = allOk ? 'rgba(74,222,128,.85)'
-              : faceOk==='none' ? 'rgba(245,200,66,.5)'
-              : 'rgba(249,115,22,.75)';
-  const cornerC = allOk ? '#4ade80' : '#F5C842';
-  const L=16;
-  const corners=[[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
-  const room = w-(fX+fW) > 38;
-  const lb = fX+fW+8;
-
-  let svg = `<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}' viewBox='0 0 ${w} ${h}'>
-  <defs><mask id='m'><rect width='100%' height='100%' fill='white'/><rect x='${fX}' y='${fY}' width='${fW}' height='${fH}' fill='black'/></mask></defs>
-  <rect width='100%' height='100%' fill='rgba(0,0,0,.5)' mask='url(#m)'/>
-  <rect x='${fX}' y='${fY}' width='${fW}' height='${fH}' fill='none' stroke='rgba(232,213,163,.45)' stroke-width='1.2'/>`;
-
-  for(const [cx,cy,dx,dy] of corners) {
-    svg += `<line x1='${cx}' y1='${cy}' x2='${cx+dx*L}' y2='${cy}' stroke='${cornerC}' stroke-width='2.5' stroke-linecap='round'/>`;
-    svg += `<line x1='${cx}' y1='${cy}' x2='${cx}' y2='${cy+dy*L}' stroke='${cornerC}' stroke-width='2.5' stroke-linecap='round'/>`;
-  }
-
-  svg += `<ellipse cx='${oCX}' cy='${oCY}' rx='${oW/2}' ry='${oH/2}' fill='none' stroke='${ovalC}' stroke-width='1.8' stroke-dasharray='5,4'/>`;
-  svg += `<line x1='${fX+fW*.28}' y1='${crY}' x2='${fX+fW*.72}' y2='${crY}' stroke='rgba(245,200,66,.28)' stroke-width='1' stroke-dasharray='3,5'/>`;
-  svg += `<line x1='${fX+fW*.18}' y1='${eY}'  x2='${fX+fW*.82}' y2='${eY}'  stroke='rgba(100,200,255,.28)' stroke-width='1' stroke-dasharray='3,5'/>`;
-  svg += `<line x1='${fX+fW*.28}' y1='${chY}' x2='${fX+fW*.72}' y2='${chY}' stroke='rgba(245,200,66,.28)' stroke-width='1' stroke-dasharray='3,5'/>`;
-  svg += `<text x='${fX+fW/2}' y='${fY-7}' fill='rgba(232,213,163,.65)' font-size='10' font-family='monospace' text-anchor='middle' letter-spacing='1'>${size}</text>`;
-  if(room) {
-    svg += `<text x='${lb}' y='${crY+4}'  fill='rgba(245,200,66,.55)'  font-size='9' font-family='monospace'>темя</text>`;
-    svg += `<text x='${lb}' y='${eY+4}'   fill='rgba(100,200,255,.55)' font-size='9' font-family='monospace'>глаза</text>`;
-    svg += `<text x='${lb}' y='${chY+4}'  fill='rgba(245,200,66,.55)'  font-size='9' font-family='monospace'>подб.</text>`;
-  }
-  svg += `</svg>`;
-  return svg;
-}
-
-// ═══════════════════════════════════════════════════════
-// Main App (vanilla JS, no React — faster on mobile)
-// ═══════════════════════════════════════════════════════
-const root = document.getElementById('root');
-
-const state = {
-  photoType: 'passport',
-  facingMode: 'user',
-  captured: null,
-  flash: false,
-  processing: false,
-  faceStatus: 'loading',   // loading|none|too_far|too_close|off_center|ok
-  headStatus: 'loading',   // loading|ok|tilt_left|tilt_right|turn_left|turn_right|look_up|look_down|n/a
-  lightStatus: 'checking', // checking|dark|bright|uneven|ok
-  modelReady: false,
-  bgRemove: false,
-};
-
-// DOM refs
-let video, liveCanvas, captureCanvas, svgEl, hintEl, flashEl;
-let sdFace, sdHead, sdLight, stFace, stHead, stLight;
-let captureBtn;
-let blazeModel = null;
-let analyzeTimer = null;
-let rafId = null;
-let stream = null;
-
-function render() {
-  root.innerHTML = buildUI();
-  bindRefs();
-  startCamera();
-  startModel();
-}
-
-function buildUI() {
-  const t = TYPES[state.photoType];
-  return `
-<div class="app">
-  <div class="hdr">
-    <div class="hdr-title">⊞ ФОТО НА ДОКУМЕНТЫ РФ</div>
-    <div class="pills">
-      ${Object.entries(TYPES).map(([k,v])=>`
-        <button class="pill${state.photoType===k?' on':''}" onclick="setType('${k}')">${v.label}</button>
-      `).join('')}
-    </div>
-    <div class="sub">${t.size} · ${t.desc}</div>
-  </div>
-
-  ${state.captured ? buildPreview() : buildViewfinder()}
-
-  ${!state.captured ? `
-  <div class="sbar" id="sbar">
-    ${buildStatusPill('face', state.faceStatus)}
-    ${buildStatusPill('head', state.headStatus)}
-    ${buildStatusPill('light', state.lightStatus)}
-  </div>` : ''}
-
-  ${!state.modelReady && !state.captured ? `<div class="mbar"><div class="mbar-inner"></div></div>` : ''}
-
-  <div class="ctrl">
-    ${state.captured ? `
-      <button class="abtn" onclick="retake()">↩ Переснять</button>
-      <button class="abtn p" onclick="download()">↓ Сохранить</button>
-    ` : `
-      <button class="icobtn" onclick="flipCam()" title="Переключить камеру">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M20 7h-9"/><path d="M14 17H5"/>
-          <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
-        </svg>
-      </button>
-      <button class="cbtn${isReady()?' rdy':''}" id="cbtn" onclick="capturePhoto()">
-        <div class="ci"></div>
-      </button>
-      <button class="icobtn${state.bgRemove?' on':''}" onclick="toggleBg()" title="Замена фона">🪄</button>
-    `}
-  </div>
-
-  <div class="req">
-    <h4>ТРЕБОВАНИЯ ГОСТ Р 52425-2005</h4>
-    <div class="req-g">
-      ${REQS.map(([k,v])=>`
-        <div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>
-      `).join('')}
-    </div>
-  </div>
-</div>`;
-}
-
-function buildViewfinder() {
-  return `
-<div class="vf" id="vf">
-  <video id="vid" autoplay playsinline muted style="position:absolute;width:1px;height:1px;opacity:0"></video>
-  <canvas id="liveC" class="live${state.facingMode==='user'?' mirror':''}"></canvas>
-  <div id="svgOv" class="svg-ov"></div>
-  <div id="flashEl" style="display:none" class="flash"></div>
-  ${state.processing ? `<div class="proc"><div class="spin"></div><p>ОБРАБОТКА</p><small>${state.bgRemove?'удаление фона · ':''}коррекция света</small></div>` : ''}
-  <div id="hintEl" class="hint"></div>
-</div>`;
-}
-
-function buildPreview() {
-  return `
-<div class="vf">
-  <div class="prev">
-    <img src="${state.captured}" alt="preview"/>
-    <div class="prev-badge"><span style="color:#4ade80">✓</span> Фото готово</div>
-  </div>
-</div>`;
-}
-
-const PILL_CONF = {
-  face: {
-    loading:    ['#666','Инициализация...'],
-    none:       ['#ef4444','Лицо не найдено'],
-    too_close:  ['#f97316','Отойдите дальше'],
-    too_far:    ['#f97316','Подойдите ближе'],
-    off_center: ['#f97316','Выровняйте центр'],
-    ok:         ['#4ade80','Позиция ✓'],
-  },
-  head: {
-    loading:    ['#666','Анализ...'],
-    'n/a':      ['#888','Голова — вручную'],
-    tilt_left:  ['#f97316','Наклон влево'],
-    tilt_right: ['#f97316','Наклон вправо'],
-    turn_left:  ['#f97316','Повернитесь вправо'],
-    turn_right: ['#f97316','Повернитесь влево'],
-    look_up:    ['#f97316','Опустите подбородок'],
-    look_down:  ['#f97316','Поднимите подбородок'],
-    ok:         ['#4ade80','Голова ✓'],
-  },
-  light: {
-    checking: ['#666','Свет — анализ...'],
-    dark:     ['#ef4444','Слишком темно'],
-    bright:   ['#f97316','Слишком ярко'],
-    uneven:   ['#f97316','Неравный свет'],
-    ok:       ['#4ade80','Свет ✓'],
-  },
-};
-
-function buildStatusPill(type, status) {
-  const cfg = PILL_CONF[type];
-  const [dot, text] = cfg[status] || cfg['loading'] || ['#666','...'];
-  const border = dot==='#4ade80' ? 'rgba(74,222,128,.22)' : 'rgba(255,255,255,.07)';
-  return `<div class="sp" style="border-color:${border}">
-    <div class="sd" style="background:${dot}"></div>
-    <span class="st" style="color:${dot}">${text}</span>
-  </div>`;
-}
-
-function isReady() {
-  return (state.faceStatus==='ok') &&
-         (state.headStatus==='ok'||state.headStatus==='n/a') &&
-         state.lightStatus==='ok';
-}
-
-function bindRefs() {
-  video = document.getElementById('vid');
-  liveCanvas = document.getElementById('liveC');
-  captureCanvas = document.createElement('canvas');
-  svgEl = document.getElementById('svgOv');
-  hintEl = document.getElementById('hintEl');
-  flashEl = document.getElementById('flashEl');
-}
-
-// ── Camera ─────────────────────────────────────────────
-async function startCamera() {
-  if(stream) stream.getTracks().forEach(t=>t.stop());
-  cancelAnimationFrame(rafId);
-  clearTimeout(analyzeTimer);
-  state.faceStatus='loading'; state.headStatus='loading'; state.lightStatus='checking';
-  updateStatusBar(); updateHint();
-
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:state.facingMode, width:{ideal:1920}, height:{ideal:1080} },
-      audio:false
-    });
-    if(!video) return;
-    video.srcObject = stream;
-    video.addEventListener('loadedmetadata', () => {
-      if(liveCanvas) { liveCanvas.width=video.videoWidth; liveCanvas.height=video.videoHeight; }
-      startRenderLoop();
-      scheduleAnalyze(800);
-    }, {once:true});
-  } catch(e) {
-    const vf = document.getElementById('vf');
-    if(vf) vf.insertAdjacentHTML('beforeend',`<div class="err"><i>📷</i>Нет доступа к камере.<br>Разрешите камеру в настройках браузера.</div>`);
-  }
-}
-
-// ── Render loop ────────────────────────────────────────
-function startRenderLoop() {
-  const draw = () => {
-    if(!video||!liveCanvas||video.readyState<2) { rafId=requestAnimationFrame(draw); return; }
-    const ctx = liveCanvas.getContext('2d');
-    const vw=video.videoWidth, vh=video.videoHeight;
-    // Resize canvas to match display size
-    const rect=liveCanvas.getBoundingClientRect();
-    if(rect.width>0 && liveCanvas.width!==Math.round(rect.width*devicePixelRatio)) {
-      liveCanvas.width=Math.round(rect.width*devicePixelRatio);
-      liveCanvas.height=Math.round(rect.height*devicePixelRatio);
-    }
-    const cw=liveCanvas.width, ch=liveCanvas.height;
-    const scale=Math.max(cw/vw,ch/vh);
-    const dw=vw*scale, dh=vh*scale;
-    ctx.drawImage(video,(cw-dw)/2,(ch-dh)/2,dw,dh);
-    // Update SVG overlay
-    if(svgEl) {
-      const svg=buildOverlay(cw,ch,state.photoType,state.faceStatus,state.headStatus);
-      svgEl.innerHTML=svg;
-      svgEl.style.width=cw+'px'; svgEl.style.height=ch+'px';
-    }
-    rafId=requestAnimationFrame(draw);
-  };
-  rafId=requestAnimationFrame(draw);
-}
-
-// ── BlazeFace model ────────────────────────────────────
-async function startModel() {
-  try {
-    await tf.setBackend('webgl');
-    blazeModel = await blazeface.load();
-    state.modelReady=true;
-    // Remove loading bar
-    const mb=document.querySelector('.mbar');
-    if(mb)mb.remove();
-  } catch(e) {
-    console.warn('BlazeFace load failed:',e);
-    state.modelReady=false;
-    state.faceStatus='n/a'; state.headStatus='n/a';
-    updateStatusBar(); updateHint();
-  }
-}
-
-// ── Analysis loop ──────────────────────────────────────
-function scheduleAnalyze(delay=700) {
-  clearTimeout(analyzeTimer);
-  analyzeTimer = setTimeout(runAnalysis, delay);
-}
-
-async function runAnalysis() {
-  if(state.captured) return;
-  const vid=video;
-  if(!vid||vid.readyState<2||!vid.videoWidth) { scheduleAnalyze(500); return; }
-
-  // Brightness
-  try {
-    const {avg,evenness}=analyzeBrightness(vid);
-    if(avg<72)           state.lightStatus='dark';
-    else if(avg>230)     state.lightStatus='bright';
-    else if(evenness>.3) state.lightStatus='uneven';
-    else                 state.lightStatus='ok';
-  } catch{ state.lightStatus='ok'; }
-
-  // Face + head
-  if(blazeModel) {
-    try {
-      const preds = await blazeModel.estimateFaces(vid, false);
-      if(preds.length) {
-        const r = analyzeFace(preds[0], vid.videoWidth, vid.videoHeight);
-        state.faceStatus = r.pos;
-        state.headStatus = r.head;
-      } else {
-        state.faceStatus='none'; state.headStatus='n/a';
-      }
-    } catch{ state.faceStatus='ok'; state.headStatus='n/a'; }
-  } else if(state.modelReady===false && state.faceStatus==='loading') {
-    state.faceStatus='n/a'; state.headStatus='n/a';
-  }
-
-  updateStatusBar();
+// ── Controls switching ────────────────────────────────────────────────
+function showCaptureControls() {
+  const ctrl=document.getElementById('ctrl');
+  if(!ctrl) return;
+  ctrl.innerHTML=`
+    <button class="icobtn" onclick="flipCam()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 7h-9"/><path d="M14 17H5"/>
+        <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
+      </svg>
+    </button>
+    <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
+    <button class="icobtn${S.bgRemove?' on':''}" id="bgBtn" onclick="toggleBg()" title="Замена фона">🪄</button>`;
+  hintEl=document.getElementById('hintEl'); // re-bind after re-render
   updateHint();
-  scheduleAnalyze(700);
 }
 
-function updateStatusBar() {
-  const sbar=document.getElementById('sbar');
-  if(!sbar) return;
-  sbar.innerHTML=
-    buildStatusPill('face',state.faceStatus)+
-    buildStatusPill('head',state.headStatus)+
-    buildStatusPill('light',state.lightStatus);
+function showPreviewControls() {
+  const ctrl=document.getElementById('ctrl');
+  if(!ctrl) return;
+  ctrl.innerHTML=`
+    <button class="abtn" onclick="retake()">↩ Переснять</button>
+    <button class="abtn p" onclick="dlPhoto()">↓ Сохранить</button>`;
+  const sb=document.getElementById('sbar'); if(sb) sb.style.display='none';
 }
 
-function updateHint() {
-  if(!hintEl) return;
-  let txt='', cls='';
-  const f=state.faceStatus, h=state.headStatus, l=state.lightStatus;
-  if(f==='loading')      { txt='Инициализация...'; }
-  else if(f==='none')    { txt='Встаньте перед камерой'; cls='warn'; }
-  else if(f==='too_close'){txt='Отойдите дальше'; cls='warn'; }
-  else if(f==='too_far') { txt='Подойдите ближе'; cls='warn'; }
-  else if(f==='off_center'){txt='Выровняйте лицо по центру'; cls='warn'; }
-  else if(h==='tilt_left') {txt='Наклоните голову вправо'; cls='warn'; }
-  else if(h==='tilt_right'){txt='Наклоните голову влево'; cls='warn'; }
-  else if(h==='turn_left') {txt='Повернитесь правее'; cls='warn'; }
-  else if(h==='turn_right'){txt='Повернитесь левее'; cls='warn'; }
-  else if(h==='look_up')   {txt='Опустите подбородок'; cls='warn'; }
-  else if(h==='look_down') {txt='Поднимите подбородок'; cls='warn'; }
-  else if(l==='dark')   { txt='Добавьте освещения'; cls='warn'; }
-  else if(l==='bright') { txt='Уменьшите яркость'; cls='warn'; }
-  else if(l==='uneven') { txt='Нужен равномерный свет с двух сторон'; cls='warn'; }
-  else if(isReady())    { txt='✓ Готово — нажмите кнопку'; cls='ok'; }
-  else                  { txt='Совместите лицо с овалом'; }
-  hintEl.textContent=txt;
-  hintEl.className='hint'+(cls?' '+cls:'');
-  // Pulse capture button
-  const cb=document.getElementById('cbtn');
-  if(cb) { cb.className='cbtn'+(isReady()?' rdy':''); }
+// ── User actions ──────────────────────────────────────────────────────
+function setType(k) {
+  S.type=k;
+  // Update pills
+  document.querySelectorAll('.pill').forEach((b,i)=>{
+    b.className='pill'+(Object.keys(TYPES)[i]===k?' on':'');
+  });
+  document.getElementById('subDesc').textContent=`${TYPES[k].size} · ${TYPES[k].desc}`;
+  updateReqGrid();
 }
-
-// ── Capture ────────────────────────────────────────────
-async function capturePhoto() {
-  if(!video||video.readyState<2) return;
-  state.processing=true;
-
-  // Show flash
-  if(flashEl) { flashEl.style.display='block'; setTimeout(()=>{if(flashEl)flashEl.style.display='none';},220); }
-
-  // Crop to document aspect ratio from video centre
-  const { aspect } = TYPES[state.photoType];
-  const vw=video.videoWidth, vh=video.videoHeight;
-  let cW,cH;
-  if(vw/vh > aspect) { cH=vh; cW=Math.round(vh*aspect); }
-  else               { cW=vw; cH=Math.round(vw/aspect); }
-  const srcX=Math.round((vw-cW)/2), srcY=Math.round((vh-cH)/2);
-
-  captureCanvas.width=cW; captureCanvas.height=cH;
-  const ctx=captureCanvas.getContext('2d');
-
-  // Mirror front camera correctly
-  if(state.facingMode==='user') {
-    ctx.save();
-    ctx.translate(cW,0);
-    ctx.scale(-1,1);
-    ctx.drawImage(video, srcX, srcY, cW, cH, 0, 0, cW, cH);
-    ctx.restore();
-  } else {
-    ctx.drawImage(video, srcX, srcY, cW, cH, 0, 0, cW, cH);
-  }
-
-  // Show processing overlay
-  const vf=document.getElementById('vf');
-  if(vf) {
-    const po=document.createElement('div');
-    po.className='proc';
-    po.innerHTML=`<div class="spin"></div><p>ОБРАБОТКА</p><small>${state.bgRemove?'удаление фона · ':''}коррекция света</small>`;
-    vf.appendChild(po);
-  }
-
-  await new Promise(r=>setTimeout(r,60));
-
-  try {
-    if(state.bgRemove) removeBackground(ctx, cW, cH);
-    smoothLight(ctx, cW, cH);
-  } catch(e) { console.warn('Post-proc error:',e); }
-
-  state.captured = captureCanvas.toDataURL('image/jpeg', 0.95);
-  state.processing=false;
-  cancelAnimationFrame(rafId);
-  clearTimeout(analyzeTimer);
-  render();
-}
-
-// ── Controls ───────────────────────────────────────────
-function setType(t) { state.photoType=t; render(); }
 
 function flipCam() {
-  state.facingMode = state.facingMode==='user' ? 'environment' : 'user';
-  render();
+  S.facing = S.facing==='user'?'environment':'user';
+  // Clear viewfinder then restart
+  const vf=document.getElementById('vf');
+  vf.innerHTML='<canvas id="liveC"></canvas><div id="hintEl" class="hint">Инициализация...</div>';
+  liveCanvas=document.getElementById('liveC');
+  hintEl=document.getElementById('hintEl');
+  const sb=document.getElementById('sbar');if(sb)sb.style.display='flex';
+  showCaptureControls();
+  startCamera();
 }
 
 function toggleBg() {
-  state.bgRemove = !state.bgRemove;
-  // Re-render controls only
-  const btns=document.querySelectorAll('.icobtn');
-  btns.forEach(b=>{ if(b.title==='Замена фона') b.className='icobtn'+(state.bgRemove?' on':''); });
+  S.bgRemove=!S.bgRemove;
+  const b=document.getElementById('bgBtn');
+  if(b) {
+    b.className='icobtn'+(S.bgRemove?' on':'');
+    b.title=S.bgRemove?'Замена фона ВКЛ (при съёмке)':'Замена фона на белый при съёмке';
+  }
 }
 
 function retake() {
-  state.captured=null;
-  render();
+  S.captured=null;
+  const vf=document.getElementById('vf');
+  vf.innerHTML='<canvas id="liveC"></canvas><div id="hintEl" class="hint">Инициализация...</div>';
+  liveCanvas=document.getElementById('liveC');
+  hintEl=document.getElementById('hintEl');
+  const sb=document.getElementById('sbar');if(sb)sb.style.display='flex';
+  showCaptureControls();
+  startCamera();
 }
 
-function download() {
-  if(!state.captured) return;
+function dlPhoto() {
+  if(!S.captured) return;
   const a=document.createElement('a');
-  a.href=state.captured; a.download=`doc_photo_${Date.now()}.jpg`; a.click();
+  a.href=S.captured; a.download=`doc_photo_${Date.now()}.jpg`; a.click();
 }
 
-// ── Boot ───────────────────────────────────────────────
-render();
+function showError(msg) {
+  const vf=document.getElementById('vf');
+  if(vf) vf.insertAdjacentHTML('beforeend',
+    `<div class="cam-err">📷<br>${msg}</div>`);
+}
+
+// ── Go ───────────────────────────────────────────────────────────────
+boot();
 </script>
 </body>
 </html>
