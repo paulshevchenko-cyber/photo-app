@@ -1,465 +1,411 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-<meta name="theme-color" content="#0E0E12" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="theme-color" content="#0E0E12"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
 <title>Фото на документы РФ</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body, #root { height: 100%; background: #0E0E12; }
-  body { overflow: hidden; -webkit-tap-highlight-color: transparent; font-family: 'Courier New', monospace; }
-  button { cursor: pointer; font-family: 'Courier New', monospace; }
-  button:active { opacity: 0.7; transform: scale(0.97); }
-
-  .root {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: #0E0E12;
-    color: #E8D5A3;
-    max-width: 480px;
-    margin: 0 auto;
-    user-select: none;
-  }
-
-  /* Header */
-  .header {
-    padding: 10px 14px 8px;
-    border-bottom: 1px solid rgba(232,213,163,0.1);
-    background: rgba(0,0,0,0.5);
-    flex-shrink: 0;
-  }
-  .header-title {
-    display: flex; align-items: center; gap: 7px;
-    font-size: 10px; letter-spacing: 0.16em; color: #E8D5A3;
-    margin-bottom: 8px; font-weight: bold;
-  }
-  .header-icon { color: #F5C842; font-size: 13px; }
-  .type-pills { display: flex; gap: 5px; flex-wrap: wrap; }
-  .type-pill {
-    background: transparent;
-    border: 1px solid rgba(232,213,163,0.22);
-    border-radius: 3px;
-    color: rgba(232,213,163,0.5);
-    font-size: 10px;
-    padding: 4px 9px;
-    letter-spacing: 0.04em;
-    transition: all 0.15s;
-  }
-  .type-pill.active {
-    background: rgba(245,200,66,0.13);
-    border-color: #F5C842;
-    color: #F5C842;
-  }
-  .type-desc {
-    font-size: 9px; color: rgba(232,213,163,0.35);
-    margin-top: 5px; letter-spacing: 0.07em;
-  }
-
-  /* Viewfinder */
-  .viewfinder {
-    flex: 1;
-    position: relative;
-    background: #000;
-    overflow: hidden;
-    min-height: 0;
-  }
-  .viewfinder video {
-    width: 100%; height: 100%;
-    object-fit: cover; display: block;
-  }
-  .mirror { transform: scaleX(-1); }
-  .svg-overlay {
-    position: absolute; inset: 0;
-    pointer-events: none;
-  }
-  .flash {
-    position: absolute; inset: 0;
-    background: white; opacity: 0.9;
-    pointer-events: none; z-index: 10;
-    animation: flashFade 0.25s forwards;
-  }
-  @keyframes flashFade { to { opacity: 0; } }
-  .hint {
-    position: absolute; bottom: 10px;
-    left: 50%; transform: translateX(-50%);
-    background: rgba(0,0,0,0.62);
-    color: rgba(232,213,163,0.72);
-    font-size: 9px; padding: 5px 13px;
-    border-radius: 20px; white-space: nowrap;
-    letter-spacing: 0.06em;
-    border: 1px solid rgba(232,213,163,0.13);
-    pointer-events: none;
-  }
-  .cam-error {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 14px; color: #E8D5A3; font-size: 13px;
-    text-align: center; padding: 28px;
-    background: rgba(0,0,0,0.85);
-    white-space: pre-line; line-height: 1.6;
-  }
-  .cam-error span { font-size: 36px; }
-
-  /* Preview */
-  .preview-wrap {
-    width: 100%; height: 100%;
-    display: flex; align-items: center;
-    justify-content: center;
-    background: #111115; position: relative;
-  }
-  .preview-wrap img {
-    max-width: 100%; max-height: 100%;
-    object-fit: contain; display: block;
-  }
-  .preview-badge {
-    position: absolute; top: 12px; right: 12px;
-    background: rgba(0,0,0,0.72);
-    border: 1px solid #4ade80; border-radius: 4px;
-    padding: 4px 10px; font-size: 11px; color: #fff;
-    letter-spacing: 0.05em;
-  }
-
-  /* Controls */
-  .controls {
-    display: flex; align-items: center;
-    justify-content: space-around;
-    padding: 14px 24px;
-    background: #0E0E12;
-    border-top: 1px solid rgba(232,213,163,0.08);
-    gap: 10px; flex-shrink: 0;
-  }
-  .capture-btn {
-    width: 66px; height: 66px; border-radius: 50%;
-    border: 3px solid #F5C842; background: transparent;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    box-shadow: 0 0 18px rgba(245,200,66,0.18);
-    transition: box-shadow 0.15s;
-  }
-  .capture-btn:active { box-shadow: 0 0 30px rgba(245,200,66,0.45); }
-  .capture-inner {
-    width: 50px; height: 50px; border-radius: 50%;
-    background: #F5C842; pointer-events: none;
-  }
-  .flip-btn {
-    width: 44px; height: 44px; border-radius: 50%;
-    border: 1px solid rgba(232,213,163,0.22);
-    background: rgba(232,213,163,0.04);
-    color: #E8D5A3;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .spacer { width: 44px; height: 44px; flex-shrink: 0; }
-  .action-btn {
-    flex: 1; padding: 12px 0;
-    background: transparent;
-    border: 1px solid rgba(232,213,163,0.28);
-    color: #E8D5A3; border-radius: 4px;
-    font-size: 12px; letter-spacing: 0.1em;
-  }
-  .action-btn.primary {
-    background: rgba(245,200,66,0.13);
-    border-color: #F5C842; color: #F5C842;
-  }
-
-  /* Requirements */
-  .req-panel {
-    padding: 10px 14px 14px;
-    border-top: 1px solid rgba(232,213,163,0.07);
-    background: rgba(0,0,0,0.28); flex-shrink: 0;
-  }
-  .req-title {
-    font-size: 8px; letter-spacing: 0.2em;
-    color: rgba(232,213,163,0.3); margin-bottom: 7px;
-  }
-  .req-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px;
-  }
-  .req-item {
-    display: flex; justify-content: space-between;
-    font-size: 9px; padding: 3px 0;
-    border-bottom: 1px solid rgba(232,213,163,0.06);
-  }
-  .req-key { color: rgba(232,213,163,0.37); }
-  .req-val { color: rgba(232,213,163,0.72); text-align: right; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body,#root{height:100%;background:#0E0E12}
+body{overflow:hidden;-webkit-tap-highlight-color:transparent;font-family:'Courier New',monospace}
+button{cursor:pointer;font-family:'Courier New',monospace}
+button:active{opacity:.75}
+.root{height:100vh;display:flex;flex-direction:column;background:#0E0E12;color:#E8D5A3;max-width:480px;margin:0 auto;user-select:none}
+.header{padding:10px 14px 8px;border-bottom:1px solid rgba(232,213,163,.1);background:rgba(0,0,0,.5);flex-shrink:0}
+.header-title{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.16em;color:#E8D5A3;margin-bottom:8px;font-weight:bold}
+.header-icon{color:#F5C842;font-size:13px}
+.type-pills{display:flex;gap:5px;flex-wrap:wrap}
+.type-pill{background:transparent;border:1px solid rgba(232,213,163,.22);border-radius:3px;color:rgba(232,213,163,.5);font-size:10px;padding:4px 9px;letter-spacing:.04em;transition:all .15s}
+.type-pill.active{background:rgba(245,200,66,.13);border-color:#F5C842;color:#F5C842}
+.type-desc{font-size:9px;color:rgba(232,213,163,.35);margin-top:5px;letter-spacing:.07em}
+.viewfinder{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
+.viewfinder video{width:100%;height:100%;object-fit:cover;display:block}
+.mirror{transform:scaleX(-1)}
+.svg-overlay{position:absolute;inset:0;pointer-events:none}
+.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:10;animation:flashFade .25s forwards}
+@keyframes flashFade{to{opacity:0}}
+.hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.65);color:rgba(232,213,163,.75);font-size:9px;padding:5px 14px;border-radius:20px;white-space:nowrap;letter-spacing:.06em;border:1px solid rgba(232,213,163,.13);pointer-events:none;transition:color .3s,border-color .3s}
+.hint.ready{color:#4ade80;border-color:rgba(74,222,128,.35)}
+.cam-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#E8D5A3;font-size:13px;text-align:center;padding:28px;background:rgba(0,0,0,.87);white-space:pre-line;line-height:1.6}
+.cam-error span{font-size:36px}
+.proc-overlay{position:absolute;inset:0;background:rgba(0,0,0,.88);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:20}
+.proc-spinner{width:38px;height:38px;border:3px solid rgba(245,200,66,.18);border-top-color:#F5C842;border-radius:50%;animation:spin .75s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-label{color:#E8D5A3;font-size:11px;letter-spacing:.12em}
+.proc-sub{font-size:9px;color:rgba(232,213,163,.4);letter-spacing:.07em}
+.preview-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#111115;position:relative}
+.preview-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.preview-badge{position:absolute;top:12px;right:12px;background:rgba(0,0,0,.75);border:1px solid #4ade80;border-radius:4px;padding:4px 10px;font-size:11px;color:#fff;letter-spacing:.05em}
+.status-bar{display:flex;gap:6px;padding:6px 10px;background:rgba(0,0,0,.45);border-top:1px solid rgba(232,213,163,.07);flex-shrink:0}
+.status-pill{flex:1;display:flex;align-items:center;gap:5px;padding:5px 8px;border-radius:4px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.06);font-size:9px;letter-spacing:.05em;transition:border-color .3s;overflow:hidden}
+.status-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:background .3s}
+.status-text{transition:color .3s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.controls{display:flex;align-items:center;justify-content:space-around;padding:12px 24px;background:#0E0E12;border-top:1px solid rgba(232,213,163,.08);gap:10px;flex-shrink:0}
+.capture-btn{width:66px;height:66px;border-radius:50%;border:3px solid #F5C842;background:transparent;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 18px rgba(245,200,66,.18);transition:border-color .3s,box-shadow .3s}
+.capture-btn.ready{border-color:#4ade80;animation:readyPulse 1.6s ease-in-out infinite}
+@keyframes readyPulse{0%,100%{box-shadow:0 0 18px rgba(74,222,128,.25)}50%{box-shadow:0 0 32px rgba(74,222,128,.6)}}
+.capture-btn:active{transform:scale(.94)}
+.capture-inner{width:50px;height:50px;border-radius:50%;background:#F5C842;transition:background .3s}
+.capture-btn.ready .capture-inner{background:#4ade80}
+.flip-btn{width:44px;height:44px;border-radius:50%;border:1px solid rgba(232,213,163,.22);background:rgba(232,213,163,.04);color:#E8D5A3;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.spacer{width:44px;height:44px;flex-shrink:0}
+.action-btn{flex:1;padding:12px 0;background:transparent;border:1px solid rgba(232,213,163,.28);color:#E8D5A3;border-radius:4px;font-size:12px;letter-spacing:.1em}
+.action-btn.primary{background:rgba(245,200,66,.13);border-color:#F5C842;color:#F5C842}
+.req-panel{padding:8px 14px 12px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.28);flex-shrink:0}
+.req-title{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.3);margin-bottom:6px}
+.req-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px 14px}
+.req-item{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;border-bottom:1px solid rgba(232,213,163,.06)}
+.req-key{color:rgba(232,213,163,.37)}
+.req-val{color:rgba(232,213,163,.72);text-align:right}
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script type="text/babel">
 const { useState, useRef, useEffect, useCallback } = React;
 
-const FACE = {
-  ovalCenterY:   0.47,
-  ovalHeightFrac:0.74,
-  ovalWidthFrac: 0.54,
-  eyeLineFrac:   0.55,
-  chinLineFrac:  0.85,
-  crownLineFrac: 0.11,
-};
-
+const FG = { ovalCY:.47, ovalH:.74, ovalW:.54, eyeY:.55, chinY:.85, crownY:.11 };
 const TYPES = {
-  passport: { label:"Паспорт / Загран", size:"35×45 мм", aspect:35/45, desc:"Загранпаспорт, ВНЖ, СНИЛС, права" },
-  visa:     { label:"Виза",             size:"35×45 мм", aspect:35/45, desc:"Шенген, US, UK, Китай" },
-  zagran:   { label:"Воен. билет",      size:"30×40 мм", aspect:30/40, desc:"Военный билет, приписное" },
+  passport:{ label:"Паспорт / Загран", size:"35×45 мм", aspect:35/45, desc:"Загранпаспорт, ВНЖ, СНИЛС" },
+  visa:    { label:"Виза",             size:"35×45 мм", aspect:35/45, desc:"Шенген, US, UK, Китай" },
+  zagran:  { label:"Воен. билет",      size:"30×40 мм", aspect:30/40, desc:"Военный билет, приписное" },
 };
+const REQS=[["Размер",null],["Лицо","70–80% высоты"],["Фон","белый / светло-серый"],
+            ["Взгляд","прямо в объектив"],["Выражение","нейтральное"],["Качество","без теней, резкое"]];
 
-const REQS = [
-  ["Размер",    null],
-  ["Лицо",      "70–80% высоты"],
-  ["Фон",       "белый / светло-серый"],
-  ["Взгляд",    "прямо в объектив"],
-  ["Выражение", "нейтральное"],
-  ["Качество",  "без теней, резкое"],
-];
+// ── Image processing ───────────────────────────────
 
-function FlipIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"
-         stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20 7h-9"/><path d="M14 17H5"/>
-      <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
-    </svg>
-  );
+function sampleBrightness(video) {
+  const W=64,H=48;
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.drawImage(video,video.videoWidth*.3,video.videoHeight*.2,video.videoWidth*.4,video.videoHeight*.6,0,0,W,H);
+  const d=ctx.getImageData(0,0,W,H).data;
+  let sum=0,lSum=0,rSum=0;
+  const n=W*H;
+  for(let i=0;i<n;i++){
+    const idx=i*4,b=.299*d[idx]+.587*d[idx+1]+.114*d[idx+2];
+    sum+=b;if(i%W<W/2)lSum+=b;else rSum+=b;
+  }
+  const avg=sum/n;
+  return{avg,evenness:avg>0?Math.abs(lSum-rSum)/(avg*n):0};
 }
 
-function Overlay({ w, h, type }) {
-  if (!w || !h) return null;
-  const { aspect, size } = TYPES[type];
+function evalFacePos(face,vw,vh){
+  const{x,y,width:fw,height:fh}=face.boundingBox;
+  const cx=(x+fw/2)/vw,cy=(y+fh/2)/vh,nh=fh/vh;
+  if(nh<0.36)return'too_far';
+  if(nh>0.80)return'too_close';
+  if(Math.abs(cx-.50)>.15||Math.abs(cy-.47)>.15)return'off_center';
+  return'ok';
+}
 
-  let fH = h * 0.83, fW = fH * aspect;
-  if (fW > w * 0.78) { fW = w * 0.78; fH = fW / aspect; }
-  const fX = (w - fW) / 2, fY = (h - fH) / 2;
+function replaceBackground(imageData,w,h){
+  const d=imageData.data;
+  const cs=Math.floor(Math.min(w,h)*.07);
+  let r=0,g=0,b=0,cnt=0;
+  for(let y=0;y<cs;y++)for(let x=0;x<cs;x++){
+    [[x,y],[w-1-x,y],[x,h-1-y],[w-1-x,h-1-y]].forEach(([px,py])=>{
+      const i=(py*w+px)*4;r+=d[i];g+=d[i+1];b+=d[i+2];cnt++;
+    });
+  }
+  r/=cnt;g/=cnt;b/=cnt;
+  for(let i=0;i<d.length;i+=4){
+    const dr=d[i]-r,dg=d[i+1]-g,db=d[i+2]-b;
+    if(Math.sqrt(dr*dr+dg*dg+db*db)<72){d[i]=255;d[i+1]=255;d[i+2]=255;}
+  }
+  return imageData;
+}
 
-  const ovalW  = fW * FACE.ovalWidthFrac;
-  const ovalH  = fH * FACE.ovalHeightFrac;
-  const ovalCX = fX + fW / 2;
-  const ovalCY = fY + fH * FACE.ovalCenterY;
-  const eyeY   = fY + fH * FACE.eyeLineFrac;
-  const crownY = fY + fH * FACE.crownLineFrac;
-  const chinY  = fY + fH * FACE.chinLineFrac;
-  const lblX   = fX + fW + 7;
-  const corners = [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
-  const L = 16;
+function smoothFaceLight(imageData,w,h){
+  const d=imageData.data;
+  const fx=Math.floor(w*.2),fy=Math.floor(h*.08),fw=Math.floor(w*.6),fh=Math.floor(h*.80);
+  let sum=0,cnt=0;
+  for(let y=fy;y<Math.min(fy+fh,h);y++)for(let x=fx;x<Math.min(fx+fw,w);x++){
+    const i=(y*w+x)*4;
+    if(d[i]>245&&d[i+1]>245&&d[i+2]>245)continue;
+    sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2];cnt++;
+  }
+  if(!cnt)return imageData;
+  const mult=162/(sum/cnt);
+  if(Math.abs(mult-1)<.08)return imageData;
+  const cl=v=>Math.max(0,Math.min(255,Math.round(v)));
+  for(let y=fy;y<Math.min(fy+fh,h);y++)for(let x=fx;x<Math.min(fx+fw,w);x++){
+    const i=(y*w+x)*4;
+    if(d[i]>245&&d[i+1]>245&&d[i+2]>245)continue;
+    d[i]=cl(d[i]*mult);d[i+1]=cl(d[i+1]*mult);d[i+2]=cl(d[i+2]*mult);
+  }
+  return imageData;
+}
 
-  return (
+// ── SVG Overlay ────────────────────────────────────
+
+function Overlay({w,h,type,faceOk}){
+  if(!w||!h)return null;
+  const{aspect,size}=TYPES[type];
+  let fH=h*.83,fW=fH*aspect;
+  if(fW>w*.78){fW=w*.78;fH=fW/aspect;}
+  const fX=(w-fW)/2,fY=(h-fH)/2;
+  const oW=fW*FG.ovalW,oH=fH*FG.ovalH;
+  const oCX=fX+fW/2,oCY=fY+fH*FG.ovalCY;
+  const eY=fY+fH*FG.eyeY,cY=fY+fH*FG.crownY,chY=fY+fH*FG.chinY;
+  const oStroke=faceOk==='ok'?'rgba(74,222,128,.75)':faceOk==='none'||faceOk==='unavailable'?'rgba(245,200,66,.52)':'rgba(249,115,22,.75)';
+  const cC=faceOk==='ok'?'#4ade80':'#F5C842';
+  const L=16,lb=fX+fW+7,room=w-(fX+fW)>36;
+  const corners=[[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]];
+  return(
     <svg className="svg-overlay" width={w} height={h} viewBox={`0 0 ${w} ${h}`}>
-      <defs>
-        <mask id="m">
-          <rect width="100%" height="100%" fill="white"/>
-          <rect x={fX} y={fY} width={fW} height={fH} fill="black"/>
-        </mask>
-      </defs>
-
-      {/* vignette */}
-      <rect width="100%" height="100%" fill="rgba(0,0,0,0.56)" mask="url(#m)"/>
-
-      {/* frame */}
-      <rect x={fX} y={fY} width={fW} height={fH} fill="none"
-            stroke="#E8D5A3" strokeWidth="1.5"/>
-
-      {/* corners */}
-      {corners.map(([cx,cy,dx,dy],i) => (
+      <defs><mask id="m"><rect width="100%" height="100%" fill="white"/><rect x={fX} y={fY} width={fW} height={fH} fill="black"/></mask></defs>
+      <rect width="100%" height="100%" fill="rgba(0,0,0,.56)" mask="url(#m)"/>
+      <rect x={fX} y={fY} width={fW} height={fH} fill="none" stroke="#E8D5A3" strokeWidth="1.5"/>
+      {corners.map(([cx,cy,dx,dy],i)=>(
         <g key={i}>
-          <line x1={cx} y1={cy} x2={cx+dx*L} y2={cy}   stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round"/>
-          <line x1={cx} y1={cy} x2={cx}       y2={cy+dy*L} stroke="#F5C842" strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1={cx} y1={cy} x2={cx+dx*L} y2={cy} stroke={cC} strokeWidth="2.5" strokeLinecap="round"/>
+          <line x1={cx} y1={cy} x2={cx} y2={cy+dy*L} stroke={cC} strokeWidth="2.5" strokeLinecap="round"/>
         </g>
       ))}
-
-      {/* face oval */}
-      <ellipse cx={ovalCX} cy={ovalCY} rx={ovalW/2} ry={ovalH/2}
-               fill="none" stroke="rgba(245,200,66,0.52)"
-               strokeWidth="1.4" strokeDasharray="5,4"/>
-
-      {/* guide lines */}
-      <line x1={fX+fW*0.28} y1={crownY} x2={fX+fW*0.72} y2={crownY}
-            stroke="rgba(245,200,66,0.32)" strokeWidth="1" strokeDasharray="3,5"/>
-      <line x1={fX+fW*0.18} y1={eyeY}   x2={fX+fW*0.82} y2={eyeY}
-            stroke="rgba(100,200,255,0.32)" strokeWidth="1" strokeDasharray="3,5"/>
-      <line x1={fX+fW*0.28} y1={chinY}  x2={fX+fW*0.72} y2={chinY}
-            stroke="rgba(245,200,66,0.32)" strokeWidth="1" strokeDasharray="3,5"/>
-
-      {/* labels — only if enough room */}
-      {w - (fX + fW) > 35 && <>
-        <text x={lblX} y={crownY+4} fill="rgba(245,200,66,0.6)"   fontSize="9" fontFamily="monospace">темя</text>
-        <text x={lblX} y={eyeY+4}   fill="rgba(100,200,255,0.6)"  fontSize="9" fontFamily="monospace">глаза</text>
-        <text x={lblX} y={chinY+4}  fill="rgba(245,200,66,0.6)"   fontSize="9" fontFamily="monospace">подб.</text>
+      <ellipse cx={oCX} cy={oCY} rx={oW/2} ry={oH/2} fill="none" stroke={oStroke} strokeWidth="1.8" strokeDasharray="5,4"/>
+      <line x1={fX+fW*.28} y1={cY}  x2={fX+fW*.72} y2={cY}  stroke="rgba(245,200,66,.3)"  strokeWidth="1" strokeDasharray="3,5"/>
+      <line x1={fX+fW*.18} y1={eY}  x2={fX+fW*.82} y2={eY}  stroke="rgba(100,200,255,.3)" strokeWidth="1" strokeDasharray="3,5"/>
+      <line x1={fX+fW*.28} y1={chY} x2={fX+fW*.72} y2={chY} stroke="rgba(245,200,66,.3)"  strokeWidth="1" strokeDasharray="3,5"/>
+      {room&&<>
+        <text x={lb} y={cY+4}  fill="rgba(245,200,66,.6)"  fontSize="9" fontFamily="monospace">темя</text>
+        <text x={lb} y={eY+4}  fill="rgba(100,200,255,.6)" fontSize="9" fontFamily="monospace">глаза</text>
+        <text x={lb} y={chY+4} fill="rgba(245,200,66,.6)"  fontSize="9" fontFamily="monospace">подб.</text>
       </>}
-
-      {/* size label */}
-      <text x={fX+fW/2} y={fY-8} fill="#E8D5A3" fontSize="10"
-            fontFamily="monospace" textAnchor="middle" letterSpacing="1">
-        {size}
-      </text>
-
-      {/* crosshair */}
-      <line x1={ovalCX-7} y1={ovalCY} x2={ovalCX+7} y2={ovalCY} stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
-      <line x1={ovalCX} y1={ovalCY-7} x2={ovalCX} y2={ovalCY+7} stroke="rgba(255,255,255,0.2)" strokeWidth="1"/>
+      <text x={fX+fW/2} y={fY-8} fill="#E8D5A3" fontSize="10" fontFamily="monospace" textAnchor="middle" letterSpacing="1">{size}</text>
+      <line x1={oCX-7} y1={oCY} x2={oCX+7} y2={oCY} stroke="rgba(255,255,255,.2)" strokeWidth="1"/>
+      <line x1={oCX} y1={oCY-7} x2={oCX} y2={oCY+7} stroke="rgba(255,255,255,.2)" strokeWidth="1"/>
     </svg>
   );
 }
 
-function App() {
-  const videoRef  = useRef(null);
-  const canvasRef = useRef(null);
-  const wrapRef   = useRef(null);
-  const streamRef = useRef(null);
+// ── Status data ────────────────────────────────────
 
-  const [captured,   setCaptured]   = useState(null);
-  const [facingMode, setFacingMode] = useState("user");
-  const [camError,   setCamError]   = useState(null);
-  const [flash,      setFlash]      = useState(false);
-  const [wrapSize,   setWrapSize]   = useState({ w:0, h:0 });
-  const [photoType,  setPhotoType]  = useState("passport");
+const FACE_INFO={
+  loading:    {dot:'#666',   text:'Инициализация...'},
+  none:       {dot:'#ef4444',text:'Лицо не найдено'},
+  too_close:  {dot:'#f97316',text:'Отойдите дальше'},
+  too_far:    {dot:'#f97316',text:'Подойдите ближе'},
+  off_center: {dot:'#f97316',text:'Выровняйте по центру'},
+  ok:         {dot:'#4ade80',text:'Позиция ✓'},
+  unavailable:{dot:'#888',   text:'Позиция — вручную'},
+};
+const LIGHT_INFO={
+  checking:{dot:'#666',   text:'Анализ...'},
+  dark:    {dot:'#ef4444',text:'Слишком темно'},
+  bright:  {dot:'#f97316',text:'Слишком ярко'},
+  uneven:  {dot:'#f97316',text:'Неравномерный свет'},
+  ok:      {dot:'#4ade80',text:'Освещение ✓'},
+};
 
-  const startCamera = useCallback(async (mode) => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    setCamError(null);
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: mode, width: { ideal:1920 }, height: { ideal:1080 } },
-        audio: false,
+// ── App ────────────────────────────────────────────
+
+function App(){
+  const videoRef=useRef(null),canvasRef=useRef(null),wrapRef=useRef(null);
+  const streamRef=useRef(null),detectorRef=useRef(null),timerRef=useRef(null);
+
+  const[captured,setCaptured]=useState(null);
+  const[facingMode,setFacingMode]=useState('user');
+  const[camError,setCamError]=useState(null);
+  const[flash,setFlash]=useState(false);
+  const[wrapSize,setWrapSize]=useState({w:0,h:0});
+  const[photoType,setPhotoType]=useState('passport');
+  const[faceStatus,setFaceStatus]=useState('loading');
+  const[lightStatus,setLightStatus]=useState('checking');
+  const[processing,setProcessing]=useState(false);
+
+  const isReady=(faceStatus==='ok'||faceStatus==='unavailable')&&lightStatus==='ok';
+
+  const startCamera=useCallback(async(mode)=>{
+    clearTimeout(timerRef.current);
+    streamRef.current?.getTracks().forEach(t=>t.stop());
+    setCamError(null);setFaceStatus('loading');setLightStatus('checking');
+    try{
+      const s=await navigator.mediaDevices.getUserMedia({
+        video:{facingMode:mode,width:{ideal:1920},height:{ideal:1080}},audio:false
       });
-      streamRef.current = s;
-      if (videoRef.current) videoRef.current.srcObject = s;
-    } catch {
-      setCamError("Нет доступа к камере.\nРазрешите использование камеры в настройках браузера.");
+      streamRef.current=s;
+      if(videoRef.current)videoRef.current.srcObject=s;
+    }catch{setCamError('Нет доступа к камере.\nРазрешите камеру в настройках браузера.');}
+  },[]);
+
+  useEffect(()=>{
+    if('FaceDetector'in window){
+      try{detectorRef.current=new window.FaceDetector({maxDetectedFaces:1,fastMode:true});}
+      catch{detectorRef.current=null;}
     }
-  }, []);
+    startCamera('user');
+    return()=>{streamRef.current?.getTracks().forEach(t=>t.stop());clearTimeout(timerRef.current);};
+  },[]);
 
-  useEffect(() => {
-    startCamera("user");
-    return () => streamRef.current?.getTracks().forEach(t => t.stop());
-  }, []);
-
-  useEffect(() => {
-    const update = () => {
-      if (wrapRef.current) {
-        const r = wrapRef.current.getBoundingClientRect();
-        setWrapSize({ w: r.width, h: r.height });
+  useEffect(()=>{
+    const update=()=>{
+      if(wrapRef.current){
+        const r=wrapRef.current.getBoundingClientRect();
+        setWrapSize({w:r.width,h:r.height});
       }
     };
     update();
-    const ro = new ResizeObserver(update);
-    if (wrapRef.current) ro.observe(wrapRef.current);
-    return () => ro.disconnect();
-  }, []);
+    const ro=new ResizeObserver(update);
+    if(wrapRef.current)ro.observe(wrapRef.current);
+    return()=>ro.disconnect();
+  },[]);
 
-  const handleFlip = () => {
-    const next = facingMode === "user" ? "environment" : "user";
-    setFacingMode(next);
-    startCamera(next);
+  useEffect(()=>{
+    const analyze=async()=>{
+      const video=videoRef.current;
+      if(!video||video.readyState<2||!video.videoWidth){
+        timerRef.current=setTimeout(analyze,500);return;
+      }
+      try{
+        const{avg,evenness}=sampleBrightness(video);
+        if(avg<75)setLightStatus('dark');
+        else if(avg>225)setLightStatus('bright');
+        else if(evenness>.28)setLightStatus('uneven');
+        else setLightStatus('ok');
+      }catch{setLightStatus('ok');}
+      if(detectorRef.current){
+        try{
+          const faces=await detectorRef.current.detect(video);
+          setFaceStatus(faces.length?evalFacePos(faces[0],video.videoWidth,video.videoHeight):'none');
+        }catch{setFaceStatus('unavailable');}
+      }else{setFaceStatus('unavailable');}
+      timerRef.current=setTimeout(analyze,700);
+    };
+    const boot=setTimeout(analyze,1000);
+    return()=>{clearTimeout(boot);clearTimeout(timerRef.current);};
+  },[facingMode]);
+
+  const handleFlip=()=>{
+    const next=facingMode==='user'?'environment':'user';
+    setFacingMode(next);startCamera(next);
   };
 
-  const capture = () => {
-    const video  = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    const { aspect } = TYPES[photoType];
-    const vw = video.videoWidth, vh = video.videoHeight;
-    let cW, cH;
-    if (vw/vh > aspect) { cH = vh; cW = vh * aspect; }
-    else                { cW = vw; cH = vw / aspect; }
-    const cx = (vw-cW)/2, cy = (vh-cH)/2;
-    canvas.width = cW; canvas.height = cH;
-    const ctx = canvas.getContext("2d");
-    if (facingMode === "user") { ctx.translate(cW,0); ctx.scale(-1,1); }
-    ctx.drawImage(video, cx, cy, cW, cH, 0, 0, cW, cH);
-    setFlash(true);
-    setTimeout(() => setFlash(false), 280);
-    setCaptured(canvas.toDataURL("image/jpeg", 0.95));
+  const capture=async()=>{
+    const video=videoRef.current,canvas=canvasRef.current;
+    if(!video||!canvas)return;
+    const{aspect}=TYPES[photoType];
+    const vw=video.videoWidth,vh=video.videoHeight;
+    let cW,cH;
+    if(vw/vh>aspect){cH=vh;cW=vh*aspect;}else{cW=vw;cH=vw/aspect;}
+    const cx=(vw-cW)/2,cy=(vh-cH)/2;
+    canvas.width=cW;canvas.height=cH;
+    const ctx=canvas.getContext('2d');
+    if(facingMode==='user'){ctx.translate(cW,0);ctx.scale(-1,1);}
+    ctx.drawImage(video,cx,cy,cW,cH,0,0,cW,cH);
+    setFlash(true);setTimeout(()=>setFlash(false),280);
+    setProcessing(true);
+    await new Promise(r=>setTimeout(r,60));
+    try{
+      ctx.setTransform(1,0,0,1,0,0);
+      let imgData=ctx.getImageData(0,0,cW,cH);
+      imgData=replaceBackground(imgData,cW,cH);
+      imgData=smoothFaceLight(imgData,cW,cH);
+      ctx.putImageData(imgData,0,0);
+    }catch(e){console.warn('Post-processing:',e);}
+    setCaptured(canvas.toDataURL('image/jpeg',.95));
+    setProcessing(false);
   };
 
-  const download = () => {
-    if (!captured) return;
-    const a = document.createElement("a");
-    a.href = captured;
-    a.download = `doc_photo_${Date.now()}.jpg`;
-    a.click();
+  const download=()=>{
+    if(!captured)return;
+    const a=document.createElement('a');
+    a.href=captured;a.download=`doc_photo_${Date.now()}.jpg`;a.click();
   };
 
-  const retake = () => setCaptured(null);
+  let hintText;
+  if(faceStatus==='loading')          hintText='Инициализация камеры...';
+  else if(faceStatus==='none')        hintText='Встаньте перед камерой';
+  else if(faceStatus==='too_close')   hintText='Отойдите дальше';
+  else if(faceStatus==='too_far')     hintText='Подойдите ближе к камере';
+  else if(faceStatus==='off_center')  hintText='Выровняйте лицо по центру';
+  else if(lightStatus==='dark')       hintText='Добавьте освещение';
+  else if(lightStatus==='bright')     hintText='Уменьшите яркость';
+  else if(lightStatus==='uneven')     hintText='Равномерный свет с обеих сторон';
+  else if(isReady)                    hintText='✓ Готово к съёмке — нажмите кнопку';
+  else                                hintText='Совместите лицо с овалом';
 
-  const reqs = REQS.map(([k,v]) => [k, v ?? TYPES[photoType].size]);
+  const fi=FACE_INFO[faceStatus]||FACE_INFO.loading;
+  const li=LIGHT_INFO[lightStatus]||LIGHT_INFO.checking;
+  const reqs=REQS.map(([k,v])=>[k,v??TYPES[photoType].size]);
 
-  return (
+  return(
     <div className="root">
-      {/* ── Header ── */}
       <div className="header">
-        <div className="header-title">
-          <span className="header-icon">⊞</span> ФОТО НА ДОКУМЕНТЫ РФ
-        </div>
+        <div className="header-title"><span className="header-icon">⊞</span>ФОТО НА ДОКУМЕНТЫ РФ</div>
         <div className="type-pills">
-          {Object.entries(TYPES).map(([key, val]) => (
-            <button
-              key={key}
-              className={`type-pill${photoType === key ? " active" : ""}`}
-              onClick={() => setPhotoType(key)}
-            >{val.label}</button>
+          {Object.entries(TYPES).map(([key,val])=>(
+            <button key={key} className={`type-pill${photoType===key?' active':''}`} onClick={()=>setPhotoType(key)}>
+              {val.label}
+            </button>
           ))}
         </div>
-        <div className="type-desc">
-          {TYPES[photoType].size} · {TYPES[photoType].desc}
-        </div>
+        <div className="type-desc">{TYPES[photoType].size} · {TYPES[photoType].desc}</div>
       </div>
 
-      {/* ── Viewfinder ── */}
       <div className="viewfinder" ref={wrapRef}>
-        {!captured ? (<>
-          <video
-            ref={videoRef}
-            autoPlay playsInline muted
-            className={facingMode === "user" ? "mirror" : ""}
-          />
-          {flash && <div className="flash" key={Date.now()} />}
-          <Overlay w={wrapSize.w} h={wrapSize.h} type={photoType} />
-          {camError && (
-            <div className="cam-error">
-              <span>📷</span>{camError}
+        {!captured?(<>
+          <video ref={videoRef} autoPlay playsInline muted className={facingMode==='user'?'mirror':''}/>
+          {flash&&<div className="flash" key={Date.now()}/>}
+          <Overlay w={wrapSize.w} h={wrapSize.h} type={photoType} faceOk={faceStatus}/>
+          {processing&&(
+            <div className="proc-overlay">
+              <div className="proc-spinner"/>
+              <div className="proc-label">ОБРАБОТКА</div>
+              <div className="proc-sub">замена фона · коррекция света</div>
             </div>
           )}
-          <div className="hint">
-            Совместите лицо с овалом · взгляд прямо · светлый фон
-          </div>
-        </>) : (
+          {camError&&<div className="cam-error"><span>📷</span>{camError}</div>}
+          <div className={`hint${isReady?' ready':''}`}>{hintText}</div>
+        </>):(
           <div className="preview-wrap">
-            <img src={captured} alt="preview" />
-            <div className="preview-badge">
-              <span style={{color:"#4ade80"}}>✓</span> Фото готово
-            </div>
+            <img src={captured} alt="preview"/>
+            <div className="preview-badge"><span style={{color:'#4ade80'}}>✓</span> Фото готово</div>
           </div>
         )}
       </div>
 
-      {/* ── Controls ── */}
+      {!captured&&(
+        <div className="status-bar">
+          <div className="status-pill" style={{borderColor:fi.dot==='#4ade80'?'rgba(74,222,128,.25)':'rgba(255,255,255,.06)'}}>
+            <div className="status-dot" style={{background:fi.dot}}/>
+            <span className="status-text" style={{color:fi.dot}}>{fi.text}</span>
+          </div>
+          <div className="status-pill" style={{borderColor:li.dot==='#4ade80'?'rgba(74,222,128,.25)':'rgba(255,255,255,.06)'}}>
+            <div className="status-dot" style={{background:li.dot}}/>
+            <span className="status-text" style={{color:li.dot}}>{li.text}</span>
+          </div>
+        </div>
+      )}
+
       <div className="controls">
-        {!captured ? (<>
-          <button className="flip-btn" onClick={handleFlip} aria-label="Перевернуть камеру">
-            <FlipIcon />
+        {!captured?(<>
+          <button className="flip-btn" onClick={handleFlip}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 7h-9"/><path d="M14 17H5"/>
+              <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
+            </svg>
           </button>
-          <button className="capture-btn" onClick={capture} aria-label="Сфотографировать">
-            <div className="capture-inner" />
+          <button className={`capture-btn${isReady?' ready':''}`} onClick={capture}>
+            <div className="capture-inner"/>
           </button>
-          <div className="spacer" />
-        </>) : (<>
-          <button className="action-btn" onClick={retake}>↩ Переснять</button>
+          <div className="spacer"/>
+        </>):(<>
+          <button className="action-btn" onClick={()=>setCaptured(null)}>↩ Переснять</button>
           <button className="action-btn primary" onClick={download}>↓ Сохранить</button>
         </>)}
       </div>
 
-      {/* ── Requirements ── */}
       <div className="req-panel">
         <div className="req-title">ТРЕБОВАНИЯ ГОСТ Р 52425-2005</div>
         <div className="req-grid">
-          {reqs.map(([k,v]) => (
+          {reqs.map(([k,v])=>(
             <div className="req-item" key={k}>
               <span className="req-key">{k}</span>
               <span className="req-val">{v}</span>
@@ -467,13 +413,12 @@ function App() {
           ))}
         </div>
       </div>
-
-      <canvas ref={canvasRef} style={{display:"none"}} />
+      <canvas ref={canvasRef} style={{display:'none'}}/>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
