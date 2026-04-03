@@ -12,38 +12,49 @@
 html,body{height:100%;background:#0E0E12;overflow:hidden}
 body{font-family:'Courier New',monospace;-webkit-tap-highlight-color:transparent;color:#E8D5A3}
 button{cursor:pointer;font-family:inherit;background:none;border:none;outline:none;-webkit-appearance:none}
-button:active{transform:scale(.95)}
+button:active{transform:scale(.95);opacity:.8}
 
-/* ─── Layout ─────────────────────────────── */
-.app{height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto}
+.app{height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
 
-/* ─── Header ─────────────────────────────── */
-.hdr{flex-shrink:0;padding:9px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:#000}
+.hdr{flex-shrink:0;padding:9px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:#000;z-index:2}
 .hdr-title{font-size:10px;letter-spacing:.16em;color:#F5C842;font-weight:700;margin-bottom:7px}
 .pills{display:flex;gap:5px}
-.pill{background:transparent;border:1px solid rgba(232,213,163,.2);border-radius:3px;
-  color:rgba(232,213,163,.45);font-size:10px;padding:4px 10px;letter-spacing:.04em;transition:all .15s}
+.pill{border:1px solid rgba(232,213,163,.2);border-radius:3px;color:rgba(232,213,163,.45);font-size:10px;padding:4px 10px;letter-spacing:.04em;transition:all .15s}
 .pill.on{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 .subdesc{font-size:9px;color:rgba(232,213,163,.32);margin-top:4px;letter-spacing:.06em}
 
-/* ─── Viewfinder ─────────────────────────── */
+/* Viewfinder */
 .vf{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
-#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
 
-/* ─── Hint ───────────────────────────────── */
+/* THE FIX: video IS in the DOM, covers the viewfinder, canvas overlays it */
+#vid{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  display:block;
+}
+.mirror{transform:scaleX(-1)}
+
+/* Canvas for overlay only (transparent bg) */
+#ov{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  pointer-events:none;
+}
+
 #hint{
   position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
   background:rgba(0,0,0,.8);font-size:10px;padding:6px 16px;border-radius:20px;
   pointer-events:none;white-space:nowrap;letter-spacing:.05em;
   border:1px solid rgba(232,213,163,.14);color:rgba(232,213,163,.85);
-  max-width:92%;text-align:center;transition:color .2s,border-color .2s;
+  max-width:92%;text-align:center;z-index:2;
 }
 #hint.ok  {color:#4ade80;border-color:rgba(74,222,128,.4)}
 #hint.warn{color:#fb923c;border-color:rgba(251,146,60,.35)}
 
-/* ─── Overlays ───────────────────────────── */
 .flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:9;animation:fl .2s forwards}
 @keyframes fl{to{opacity:0}}
+
 .proc{position:absolute;inset:0;background:rgba(0,0,0,.92);z-index:20;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
 .spin{width:36px;height:36px;border:3px solid rgba(245,200,66,.15);
@@ -51,22 +62,18 @@ button:active{transform:scale(.95)}
 @keyframes sp{to{transform:rotate(360deg)}}
 .proc p{color:#E8D5A3;font-size:11px;letter-spacing:.12em}
 .proc small{font-size:9px;color:rgba(232,213,163,.4)}
-.cam-err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:12px;padding:28px;background:rgba(0,0,0,.92);
-  font-size:13px;text-align:center;line-height:1.6}
+
 .prev-wrap{position:absolute;inset:0;z-index:15;display:flex;align-items:center;
   justify-content:center;background:#111}
 .prev-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .prev-badge{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.8);
   border:1px solid #4ade80;border-radius:4px;padding:4px 10px;font-size:10px;color:#fff}
 
-/* ─── Model loading bar ──────────────────── */
-#mbar{flex-shrink:0;height:2px;background:rgba(245,200,66,.1);overflow:hidden}
-#mbar.hide{display:none}
-.mfill{height:100%;background:#F5C842;animation:mb 1.4s ease-in-out infinite}
-@keyframes mb{0%{width:0;margin-left:0}50%{width:60%;margin-left:20%}100%{width:0;margin-left:100%}}
+.cam-err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:12px;padding:28px;background:rgba(0,0,0,.92);
+  font-size:13px;text-align:center;line-height:1.6;z-index:10}
 
-/* ─── Status bar ─────────────────────────── */
+/* Status bar */
 #sbar{flex-shrink:0;display:flex;gap:4px;padding:5px 8px;
   background:rgba(0,0,0,.5);border-top:1px solid rgba(232,213,163,.08)}
 .sp{flex:1;min-width:0;display:flex;align-items:center;gap:4px;
@@ -75,14 +82,14 @@ button:active{transform:scale(.95)}
 .sd{width:6px;height:6px;min-width:6px;border-radius:50%}
 .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-/* ─── Controls ───────────────────────────── */
+/* Controls */
 #ctrl{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;
   padding:12px 24px;background:#0E0E12;border-top:1px solid rgba(232,213,163,.08);gap:10px}
 .cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;
   background:transparent;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;box-shadow:0 0 14px rgba(245,200,66,.14);transition:border-color .25s,box-shadow .25s}
-.cbtn.rdy{border-color:#4ade80;box-shadow:0 0 22px rgba(74,222,128,.35);
-  animation:rp 1.6s ease-in-out infinite}
+  flex-shrink:0;transition:border-color .25s,box-shadow .25s;
+  box-shadow:0 0 14px rgba(245,200,66,.14)}
+.cbtn.rdy{border-color:#4ade80;animation:rp 1.6s ease-in-out infinite}
 @keyframes rp{0%,100%{box-shadow:0 0 14px rgba(74,222,128,.2)}50%{box-shadow:0 0 30px rgba(74,222,128,.6)}}
 .ci{width:48px;height:48px;border-radius:50%;background:#F5C842;transition:background .25s;pointer-events:none}
 .cbtn.rdy .ci{background:#4ade80}
@@ -90,23 +97,20 @@ button:active{transform:scale(.95)}
   border:1px solid rgba(232,213,163,.2);color:#E8D5A3;
   display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
 .icobtn.on{border-color:#60a5fa;background:rgba(96,165,250,.1)}
-.abtn{flex:1;padding:11px 0;background:transparent;
-  border:1px solid rgba(232,213,163,.25);color:#E8D5A3;border-radius:4px;font-size:11px;letter-spacing:.1em}
+.abtn{flex:1;padding:11px 0;background:transparent;border:1px solid rgba(232,213,163,.25);
+  color:#E8D5A3;border-radius:4px;font-size:11px;letter-spacing:.1em}
 .abtn.p{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 
-/* ─── Req panel ──────────────────────────── */
+/* Req */
 #req{flex-shrink:0;padding:7px 14px 10px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.25)}
 #req h4{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.28);margin-bottom:5px}
 .rg{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
-.ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;
-  border-bottom:1px solid rgba(232,213,163,.06)}
+.ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;border-bottom:1px solid rgba(232,213,163,.06)}
 .rk{color:rgba(232,213,163,.35)}.rv{color:rgba(232,213,163,.7);text-align:right}
 </style>
 </head>
 <body>
 <div class="app">
-
-  <!-- HEADER -->
   <div class="hdr">
     <div class="hdr-title">⊞ ФОТО НА ДОКУМЕНТЫ РФ</div>
     <div class="pills" id="pills">
@@ -117,35 +121,31 @@ button:active{transform:scale(.95)}
     <div class="subdesc" id="subdesc">35×45 мм · Загранпаспорт, ВНЖ, СНИЛС</div>
   </div>
 
-  <!-- VIEWFINDER -->
   <div class="vf" id="vf">
-    <canvas id="cv"></canvas>
+    <!-- VIDEO IS IN THE DOM — required for Android Chrome to render -->
+    <video id="vid" autoplay playsinline muted></video>
+    <!-- Overlay canvas (transparent, draws guide lines on top of video) -->
+    <canvas id="ov"></canvas>
     <div id="hint" class="hint">Запуск камеры...</div>
   </div>
 
-  <!-- MODEL LOADING BAR -->
-  <div id="mbar"><div class="mfill"></div></div>
-
-  <!-- STATUS BAR -->
   <div id="sbar">
     <div class="sp" id="sp0"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Поз. лица...</span></div>
     <div class="sp" id="sp1"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Голова...</span></div>
     <div class="sp" id="sp2"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Свет...</span></div>
   </div>
 
-  <!-- CONTROLS -->
   <div id="ctrl">
-    <button class="icobtn" id="flipBtn" onclick="flipCam()" title="Переключить камеру">
+    <button class="icobtn" onclick="flipCam()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 7h-9"/><path d="M14 17H5"/>
         <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
       </svg>
     </button>
     <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
-    <button class="icobtn" id="bgBtn" onclick="toggleBg()" title="Белый фон при съёмке">🪄</button>
+    <button class="icobtn" id="bgBtn" onclick="toggleBg()">🪄</button>
   </div>
 
-  <!-- REQUIREMENTS -->
   <div id="req">
     <h4>ТРЕБОВАНИЯ ГОСТ Р 52425-2005</h4>
     <div class="rg" id="rg"></div>
@@ -153,638 +153,438 @@ button:active{transform:scale(.95)}
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════════
-   ALGORITHM SELECTION (after research):
-   
-   1. FACE DETECTION: MediaPipe legacy @mediapipe/face_detection@0.4
-      - Reason: Proven stable on Android Chrome, no TF.js dependency,
-        callback-based API, 6 keypoints (eyes, nose, mouth, ears),
-        ~1MB JS only (no WASM), CDN-stable on jsdelivr
-      - Alternative considered: TF.js BlazeFace — rejected (heavy, caused black screen)
-      - Alternative considered: MediaPipe tasks-vision FaceLandmarker — rejected
-        (478 landmarks overkill, WASM download adds 3-4s cold start)
-   
-   2. HEAD POSE: Geometry from 6 keypoints (tested above)
-      - Roll (tilt): atan2 of eye line vector
-      - Yaw (turn L/R): nose X offset from eye midpoint / faceWidth
-      - Pitch (chin): eye-to-nose / nose-to-mouth ratio
-      - Thresholds: ±9° roll, ±9% yaw, 0.18-0.44 e2n, 0.10-0.42 n2m
-   
-   3. BACKGROUND REMOVAL: @imgly/background-removal v1.4.5
-      - Reason: ONNX Runtime Web + WASM, isnet_quint8 model (~5MB),
-        runs in browser with no server, lazy-loaded only when user enables
-      - Better than: flood-fill (fails complex bg), MediaPipe segmentation (CDN issues)
-      - Model 'small' = good speed/quality tradeoff for document photos
-   
-   4. LIGHT CORRECTION: Pixel-level brightness normalisation
-      - Sample face-region pixels (20-82% x, 5-83% y), skip white bg
-      - Normalize average to target 158/255 (≈62% — optimal for doc photos)
-      - Apply only if correction factor differs from 1.0 by >6%
-═══════════════════════════════════════════════════════════════════ */
-
 'use strict';
 
-// ─── Config ─────────────────────────────────────────────────────────
 const TYPES = {
   passport:{ label:'Паспорт / Загран', size:'35×45 мм', aspect:35/45, desc:'Загранпаспорт, ВНЖ, СНИЛС' },
   visa:    { label:'Виза',             size:'35×45 мм', aspect:35/45, desc:'Шенген, US, UK, Китай' },
   zagran:  { label:'Воен. билет',      size:'30×40 мм', aspect:30/40, desc:'Военный билет, приписное' },
 };
-const REQS = [
-  ['Размер',null],['Лицо','70–80% высоты'],['Фон','белый / светло-серый'],
-  ['Взгляд','прямо в объектив'],['Выражение','нейтральное'],['Качество','без теней, резкое'],
-];
-// Face frame proportions (fraction of photo)
-const FR = { ovalCY:.47, ovalH:.74, ovalW:.54, eyeY:.55, chinY:.85, crownY:.11 };
+const REQS=[['Размер',null],['Лицо','70–80% высоты'],['Фон','белый / светло-серый'],
+            ['Взгляд','прямо в объектив'],['Выражение','нейтральное'],['Качество','без теней, резкое']];
+const FR={ovalCY:.47,ovalH:.74,ovalW:.54,eyeY:.55,chinY:.85,crownY:.11};
 
 // ─── State ───────────────────────────────────────────────────────────
-const S = {
-  type:'passport', facing:'user', captured:false,
-  fs:'init', hs:'init', ls:'init',
-  bgRemove:false, modelReady:false, bgModelLoaded:false,
-};
+let gType='passport', gFacing='user', gBgRemove=false, gCaptured=false;
+let gFs='init', gHs='init', gLs='init';
+let gModelReady=false, gBgLoaded=false, gRemoveBg=null;
+let gStream=null, gRaf=null, gTimer=null;
 
-// ─── DOM refs ────────────────────────────────────────────────────────
-let cv  = document.getElementById('cv');
-let ctx = cv.getContext('2d');
-const vfEl    = document.getElementById('vf');
-const hintEl  = document.getElementById('hint');
-const mbarEl  = document.getElementById('mbar');
-const capBtn  = document.getElementById('capBtn');
-
-let vid, mediaStream, rafId, analyzeTimer;
+// ─── DOM ─────────────────────────────────────────────────────────────
+const vid    = document.getElementById('vid');
+const ov     = document.getElementById('ov');
+const octx   = ov.getContext('2d');
+const vfEl   = document.getElementById('vf');
+const hintEl = document.getElementById('hint');
+const capBtn = document.getElementById('capBtn');
 const capCv  = document.createElement('canvas');
 const capCtx = capCv.getContext('2d');
-let faceDetector = null;    // MediaPipe FaceDetection instance
-let removeBackground = null; // @imgly lazy-loaded function
 
-// ─── Status pill config ──────────────────────────────────────────────
-const PCFG = {
-  face: {
-    init: ['#555','Поз. лица...'], na:['#888','Позиция — вручную'],
-    none: ['#ef4444','Лицо не найдено'], close:['#f97316','Отойдите дальше'],
-    far:  ['#f97316','Подойдите ближе'], center:['#f97316','Выровняйте центр'],
-    ok:   ['#4ade80','Позиция ✓'],
-  },
-  head: {
-    init:   ['#555','Голова...'],  na:['#888','Голова — вручную'],
-    tilt_l: ['#f97316','Наклон влево'],   tilt_r:['#f97316','Наклон вправо'],
-    turn_l: ['#f97316','Повернитесь вправо'], turn_r:['#f97316','Повернитесь влево'],
-    up:     ['#f97316','Опустите подбородок'], down:['#f97316','Поднимите подбородок'],
-    ok:     ['#4ade80','Голова ✓'],
-  },
-  light: {
-    init:   ['#555','Свет...'],     dark:['#ef4444','Слишком темно'],
-    bright: ['#f97316','Слишком ярко'], uneven:['#f97316','Неравный свет'],
-    ok:     ['#4ade80','Свет ✓'],
-  },
-};
-
-// ─── Helpers ─────────────────────────────────────────────────────────
-function setPill(id, type, status) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  const [dot, text] = (PCFG[type][status] || PCFG[type].init);
-  const bc = dot === '#4ade80' ? 'rgba(74,222,128,.22)' : 'rgba(255,255,255,.07)';
-  el.style.borderColor = bc;
-  el.innerHTML = `<div class="sd" style="background:${dot}"></div>`
-               + `<span class="st" style="color:${dot}">${text}</span>`;
-}
-
-function isReady() {
-  return S.fs === 'ok'
-    && (S.hs === 'ok' || S.hs === 'na')
-    && S.ls === 'ok';
-}
-
-function updateCapBtn() {
-  capBtn.className = 'cbtn' + (isReady() ? ' rdy' : '');
-}
-
-function updateHint() {
-  const f=S.fs, h=S.hs, l=S.ls;
-  let txt='', cls='';
-  if     (f==='init')    { txt='Инициализация...'; }
-  else if(f==='none')    { txt='Встаньте перед камерой';          cls='warn'; }
-  else if(f==='close')   { txt='Отойдите дальше';                 cls='warn'; }
-  else if(f==='far')     { txt='Подойдите ближе';                 cls='warn'; }
-  else if(f==='center')  { txt='Выровняйте лицо по центру';       cls='warn'; }
-  else if(h==='tilt_l')  { txt='Наклоните голову вправо';         cls='warn'; }
-  else if(h==='tilt_r')  { txt='Наклоните голову влево';          cls='warn'; }
-  else if(h==='turn_l')  { txt='Повернитесь правее';              cls='warn'; }
-  else if(h==='turn_r')  { txt='Повернитесь левее';               cls='warn'; }
-  else if(h==='up')      { txt='Опустите подбородок';             cls='warn'; }
-  else if(h==='down')    { txt='Поднимите подбородок';            cls='warn'; }
-  else if(l==='dark')    { txt='Добавьте освещения';              cls='warn'; }
-  else if(l==='bright')  { txt='Уменьшите яркость';               cls='warn'; }
-  else if(l==='uneven')  { txt='Нужен свет с обеих сторон';       cls='warn'; }
-  else if(isReady())     { txt='✓ Готово — нажмите кнопку';       cls='ok'; }
-  else                   { txt='Совместите лицо с овалом'; }
-  hintEl.textContent = txt;
-  hintEl.className = 'hint' + (cls ? ' '+cls : '');
-  updateCapBtn();
-}
-
-function updateSbar() {
-  setPill('sp0','face', S.fs);
-  setPill('sp1','head', S.hs);
-  setPill('sp2','light',S.ls);
-}
-
-function renderReqGrid() {
-  const t = TYPES[S.type];
-  document.getElementById('rg').innerHTML = REQS.map(([k,v]) =>
-    `<div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>`
-  ).join('');
-  document.getElementById('subdesc').textContent = `${t.size} · ${t.desc}`;
-  document.querySelectorAll('.pill').forEach((b,i) => {
-    b.className = 'pill' + (Object.keys(TYPES)[i]===S.type ? ' on' : '');
-  });
-}
-renderReqGrid();
+// ─── Init ─────────────────────────────────────────────────────────────
+renderReqs();
+startCamera();
+// Load MediaPipe face detection after a short delay (non-blocking)
+setTimeout(loadFaceModel, 2000);
 
 // ─── Camera ──────────────────────────────────────────────────────────
 function startCamera() {
-  if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
-  cancelAnimationFrame(rafId);
-  clearTimeout(analyzeTimer);
-  S.fs='init'; S.hs='init'; S.ls='init';
-  updateSbar(); updateHint();
+  if (gStream) gStream.getTracks().forEach(t=>t.stop());
+  cancelAnimationFrame(gRaf); clearTimeout(gTimer);
+  gFs='init'; gHs='init'; gLs='init';
+  setPill('sp0','face','init'); setPill('sp1','head','init'); setPill('sp2','light','init');
+  setHint('Запуск камеры...');
 
-  // Create fresh video element
-  vid = document.createElement('video');
-  vid.autoplay=true; vid.playsInline=true; vid.muted=true;
+  vid.className = gFacing==='user' ? 'mirror' : '';
 
   navigator.mediaDevices.getUserMedia({
-    video:{ facingMode: S.facing, width:{ideal:1920}, height:{ideal:1080} },
+    video:{ facingMode:gFacing, width:{ideal:1920}, height:{ideal:1080} },
     audio:false
-  }).then(stream => {
-    mediaStream = stream;
+  })
+  .then(stream => {
+    gStream = stream;
     vid.srcObject = stream;
+    // Use 'canplay' — more reliable than loadedmetadata on Android
+    vid.addEventListener('canplay', onVideoReady, {once:true});
     vid.play().catch(()=>{});
-    vid.addEventListener('loadedmetadata', () => {
-      startRenderLoop();
-      scheduleAnalysis(1000);
-    }, {once:true});
-  }).catch(err => {
-    vfEl.insertAdjacentHTML('beforeend',
-      `<div class="cam-err">📷<br>Нет доступа к камере.<br>
-       Разрешите доступ в настройках браузера.<br>
-       <small style="color:rgba(232,213,163,.4)">${err.name}: ${err.message}</small></div>`);
+  })
+  .catch(err => {
+    showErr('📷\nНет доступа к камере.\nРазрешите в настройках браузера.\n'+err.name);
   });
 }
 
-// ─── Render loop — video + overlay on one canvas ──────────────────────
-function startRenderLoop() {
-  function frame() {
-    if (!vid || vid.readyState < 2 || !vid.videoWidth) {
-      rafId = requestAnimationFrame(frame); return;
-    }
-
-    // Fit canvas to display size (with DPR for sharpness)
-    const W = vfEl.clientWidth, H = vfEl.clientHeight;
-    const dpr = Math.min(window.devicePixelRatio||1, 2);
-    const PW = (W*dpr)|0, PH = (H*dpr)|0;
-    if (cv.width!==PW || cv.height!==PH) {
-      cv.width=PW; cv.height=PH;
-      cv.style.width=W+'px'; cv.style.height=H+'px';
-    }
-
-    const vw=vid.videoWidth, vh=vid.videoHeight;
-    const scale = Math.max(PW/vw, PH/vh);
-    const dw=vw*scale, dh=vh*scale;
-    const dx=(PW-dw)/2|0, dy=(PH-dh)/2|0;
-
-    // Mirror front camera
-    if (S.facing==='user') {
-      ctx.save(); ctx.translate(PW,0); ctx.scale(-1,1);
-      ctx.drawImage(vid, dx, dy, dw, dh);
-      ctx.restore();
-    } else {
-      ctx.drawImage(vid, dx, dy, dw, dh);
-    }
-
-    drawOverlay(PW, PH);
-    rafId = requestAnimationFrame(frame);
-  }
-  rafId = requestAnimationFrame(frame);
+function onVideoReady() {
+  startOverlayLoop();
+  scheduleAnalysis(1200);
 }
 
-// ─── Overlay — drawn directly on canvas ─────────────────────────────
-function drawOverlay(W, H) {
-  const {aspect, size} = TYPES[S.type];
+// ─── Overlay loop — draws guide lines on transparent canvas ──────────
+function startOverlayLoop() {
+  function frame() {
+    if (gCaptured) return;
+    const W = vfEl.clientWidth, H = vfEl.clientHeight;
+    if (ov.width!==W||ov.height!==H) { ov.width=W; ov.height=H; }
+    octx.clearRect(0,0,W,H);
+    drawGuides(octx, W, H);
+    gRaf = requestAnimationFrame(frame);
+  }
+  gRaf = requestAnimationFrame(frame);
+}
 
-  // Frame dimensions: 83% of canvas height, centered
-  let fH = H*.83, fW = fH*aspect;
-  if (fW > W*.78) { fW=W*.78; fH=fW/aspect; }
-  const fX = ((W-fW)/2)|0, fY = ((H-fH)/2)|0;
+// ─── Guide overlay (drawn on transparent canvas over video) ──────────
+function drawGuides(c, W, H) {
+  const {aspect,size} = TYPES[gType];
+  let fH=H*.83, fW=fH*aspect;
+  if (fW>W*.78){fW=W*.78;fH=fW/aspect;}
+  const fX=(W-fW)/2|0, fY=(H-fH)/2|0;
 
-  // Vignette: 4 semi-transparent rectangles around frame
-  ctx.fillStyle = 'rgba(0,0,0,0.52)';
-  ctx.fillRect(0, 0, W, fY);                    // top
-  ctx.fillRect(0, fY+fH, W, H-fY-fH);           // bottom
-  ctx.fillRect(0, fY, fX, fH);                   // left
-  ctx.fillRect(fX+fW, fY, W-fX-fW, fH);         // right
+  // Vignette
+  c.fillStyle='rgba(0,0,0,.52)';
+  c.fillRect(0,0,W,fY);
+  c.fillRect(0,fY+fH,W,H-fY-fH);
+  c.fillRect(0,fY,fX,fH);
+  c.fillRect(fX+fW,fY,W-fX-fW,fH);
 
   // Status colours
-  const allOk  = S.fs==='ok' && (S.hs==='ok'||S.hs==='na');
-  const hasWarn = (S.fs!=='ok'&&S.fs!=='init'&&S.fs!=='na') ||
-                  (S.hs!=='ok'&&S.hs!=='na'&&S.hs!=='init');
-  const cornerC = allOk ? '#4ade80' : '#F5C842';
-  const ovalC   = allOk ? 'rgba(74,222,128,.85)'
-                : hasWarn ? 'rgba(249,115,22,.8)'
-                : 'rgba(245,200,66,.55)';
+  const ok   = gFs==='ok'&&(gHs==='ok'||gHs==='na');
+  const warn = gFs!=='ok'&&gFs!=='init'&&gFs!=='na';
+  const cc   = ok?'#4ade80':'#F5C842';
+  const oc   = ok?'rgba(74,222,128,.85)':warn?'rgba(249,115,22,.8)':'rgba(245,200,66,.55)';
 
   // Frame border
-  ctx.strokeStyle = 'rgba(232,213,163,.45)';
-  ctx.lineWidth = 1.5; ctx.setLineDash([]);
-  ctx.strokeRect(fX, fY, fW, fH);
+  c.strokeStyle='rgba(232,213,163,.45)'; c.lineWidth=1.5; c.setLineDash([]);
+  c.strokeRect(fX,fY,fW,fH);
 
-  // Corner L-brackets
-  const L = Math.min(fW,fH)*.1|0;
-  ctx.strokeStyle = cornerC;
-  ctx.lineWidth = 3; ctx.lineCap = 'round';
-  [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]].forEach(([cx,cy,dx,dy])=>{
-    ctx.beginPath(); ctx.moveTo(cx+dx*L,cy); ctx.lineTo(cx,cy); ctx.lineTo(cx,cy+dy*L); ctx.stroke();
+  // Corner brackets
+  const L=Math.min(fW,fH)*.1|0;
+  c.strokeStyle=cc; c.lineWidth=3; c.lineCap='round';
+  [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]].forEach(([x,y,dx,dy])=>{
+    c.beginPath(); c.moveTo(x+dx*L,y); c.lineTo(x,y); c.lineTo(x,y+dy*L); c.stroke();
   });
 
   // Face oval
-  const oCX=fX+fW/2, oCY=fY+fH*FR.ovalCY;
-  const oRX=fW*FR.ovalW/2, oRY=fH*FR.ovalH/2;
-  ctx.strokeStyle=ovalC; ctx.lineWidth=2; ctx.setLineDash([6,4]);
-  ctx.beginPath(); ctx.ellipse(oCX,oCY,oRX,oRY,0,0,Math.PI*2); ctx.stroke();
-  ctx.setLineDash([]);
+  c.strokeStyle=oc; c.lineWidth=2; c.setLineDash([6,4]);
+  c.beginPath();
+  c.ellipse(fX+fW/2, fY+fH*FR.ovalCY, fW*FR.ovalW/2, fH*FR.ovalH/2, 0,0,Math.PI*2);
+  c.stroke();
+  c.setLineDash([]);
 
-  // Guide lines: crown / eyes / chin
-  const eyeY=fY+fH*FR.eyeY, crY=fY+fH*FR.crownY, chY=fY+fH*FR.chinY;
-  ctx.lineWidth=1; ctx.setLineDash([4,6]);
-  ctx.strokeStyle='rgba(245,200,66,.3)';
-  ctx.beginPath(); ctx.moveTo(fX+fW*.28,crY); ctx.lineTo(fX+fW*.72,crY); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(fX+fW*.28,chY); ctx.lineTo(fX+fW*.72,chY); ctx.stroke();
-  ctx.strokeStyle='rgba(100,200,255,.3)';
-  ctx.beginPath(); ctx.moveTo(fX+fW*.18,eyeY); ctx.lineTo(fX+fW*.82,eyeY); ctx.stroke();
-  ctx.setLineDash([]);
+  // Guide lines
+  const eY=fY+fH*FR.eyeY, crY=fY+fH*FR.crownY, chY=fY+fH*FR.chinY;
+  c.lineWidth=1; c.setLineDash([4,6]);
+  c.strokeStyle='rgba(245,200,66,.3)';
+  c.beginPath();c.moveTo(fX+fW*.28,crY);c.lineTo(fX+fW*.72,crY);c.stroke();
+  c.beginPath();c.moveTo(fX+fW*.28,chY);c.lineTo(fX+fW*.72,chY);c.stroke();
+  c.strokeStyle='rgba(100,200,255,.3)';
+  c.beginPath();c.moveTo(fX+fW*.18,eY);c.lineTo(fX+fW*.82,eY);c.stroke();
+  c.setLineDash([]);
 
-  // Labels — right of frame if there's room
-  const room = W-(fX+fW) > 38;
-  const dpr = Math.min(window.devicePixelRatio||1, 2);
-  ctx.font = `${Math.round(10*dpr*.55)}px monospace`;
-  if (room) {
-    const lb = fX+fW+8;
-    ctx.fillStyle='rgba(245,200,66,.6)';
-    ctx.fillText('темя', lb, crY+4);
-    ctx.fillText('подб.', lb, chY+4);
-    ctx.fillStyle='rgba(100,200,255,.6)';
-    ctx.fillText('глаза', lb, eyeY+4);
+  // Labels
+  if (W-(fX+fW)>36) {
+    const lb=fX+fW+8, fs=Math.max(10,fW*.055|0);
+    c.font=fs+'px monospace';
+    c.fillStyle='rgba(245,200,66,.6)';
+    c.fillText('темя',lb,crY+4); c.fillText('подб.',lb,chY+4);
+    c.fillStyle='rgba(100,200,255,.6)'; c.fillText('глаза',lb,eY+4);
   }
-
-  // Size label above frame
-  const fs = Math.max(11, fW*.055)|0;
-  ctx.font = `${fs}px monospace`;
-  ctx.fillStyle = 'rgba(232,213,163,.65)';
-  ctx.textAlign = 'center';
-  ctx.fillText(size, fX+fW/2, fY-7);
-  ctx.textAlign = 'left';
+  // Size label
+  c.font=Math.max(11,fW*.055|0)+'px monospace';
+  c.fillStyle='rgba(232,213,163,.65)'; c.textAlign='center';
+  c.fillText(size,fX+fW/2,fY-7); c.textAlign='left';
 }
 
-// ─── Load MediaPipe Face Detection (async, non-blocking) ─────────────
-function loadFaceModel() {
-  function loadScript(src) {
-    return new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = src;
-      s.onload  = res;
-      s.onerror = rej;
-      document.head.appendChild(s);
-    });
-  }
-
-  const baseUrl = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/';
-
-  // Load face_detection script (only JS, no external WASM needed)
-  loadScript(baseUrl + 'face_detection.js').then(() => {
-    try {
-      faceDetector = new FaceDetection({ locateFile: f => baseUrl + f });
-      faceDetector.setOptions({ model: 'short', minDetectionConfidence: 0.5 });
-      faceDetector.onResults(onFaceResults);
-      S.modelReady = true;
-      mbarEl.classList.add('hide');
-    } catch(e) {
-      console.warn('FaceDetection init:', e);
-      fallbackToManual();
-    }
-  }).catch(e => {
-    console.warn('FaceDetection load:', e);
-    fallbackToManual();
-  });
-}
-
-function fallbackToManual() {
-  S.modelReady = false; S.fs = 'na'; S.hs = 'na';
-  mbarEl.classList.add('hide');
-  updateSbar(); updateHint();
-}
-
-// ─── Face detection results callback ─────────────────────────────────
-function onFaceResults(results) {
-  if (S.captured) return;
-  if (!results.detections || results.detections.length === 0) {
-    S.fs = 'none'; S.hs = 'na';
-  } else {
-    const det = results.detections[0];
-    analyzeFaceDetection(det);
-  }
-  updateSbar(); updateHint();
-}
-
-function analyzeFaceDetection(det) {
-  const bb  = det.boundingBox;
-  const lm  = det.landmarks;   // array of {x,y} normalized 0-1
-  const cx  = bb.xCenter, cy = bb.yCenter, nh = bb.height, nw = bb.width;
-
-  // ── Position ──
-  if      (nh < 0.28)                              S.fs = 'far';
-  else if (nh > 0.84)                              S.fs = 'close';
-  else if (Math.abs(cx-.5)>0.16 || Math.abs(cy-.47)>0.17) S.fs = 'center';
-  else                                             S.fs = 'ok';
-
-  // ── Head pose ── (landmarks: 0=rightEye,1=leftEye,2=noseTip,3=mouth,4=rEar,5=lEar)
-  if (!lm || lm.length < 4) { S.hs = 'na'; return; }
-  const re=lm[0], le=lm[1], nose=lm[2], mouth=lm[3];
-
-  // Roll: angle of the eye line (degrees)
-  const roll = Math.atan2(le.y - re.y, le.x - re.x) * 180 / Math.PI;
-
-  // Yaw: nose x-offset from eye midpoint, normalised by face width
-  const eyeMX = (re.x + le.x) / 2;
-  const yaw   = (nose.x - eyeMX) / nw;
-
-  // Pitch: vertical proportions
-  const eyeMY = (re.y + le.y) / 2;
-  const e2n   = (nose.y - eyeMY) / nh;
-  const n2m   = (mouth.y - nose.y) / nh;
-
-  if      (roll > 9)    S.hs = 'tilt_r';
-  else if (roll < -9)   S.hs = 'tilt_l';
-  else if (yaw >  0.09) S.hs = 'turn_r';
-  else if (yaw < -0.09) S.hs = 'turn_l';
-  else if (e2n < 0.18 || n2m > 0.42) S.hs = 'up';
-  else if (e2n > 0.44 || n2m < 0.10) S.hs = 'down';
-  else                  S.hs = 'ok';
-}
-
-// ─── Analysis loop ────────────────────────────────────────────────────
-function scheduleAnalysis(delay) {
-  clearTimeout(analyzeTimer);
-  analyzeTimer = setTimeout(runAnalysis, delay||700);
-}
+// ─── Analysis (brightness + optional face model) ──────────────────────
+function scheduleAnalysis(d){clearTimeout(gTimer);gTimer=setTimeout(runAnalysis,d||700);}
 
 async function runAnalysis() {
-  if (S.captured || !vid || vid.readyState<2 || !vid.videoWidth) {
-    scheduleAnalysis(500); return;
-  }
+  if (gCaptured||!vid.videoWidth) { scheduleAnalysis(500); return; }
 
-  // Brightness check (pixel sampling, no ML needed)
+  // Brightness (no ML — always works)
   try {
-    const W2=64, H2=48, tmp=document.createElement('canvas');
-    tmp.width=W2; tmp.height=H2;
-    const tc = tmp.getContext('2d');
-    tc.drawImage(vid, vid.videoWidth*.25, vid.videoHeight*.15,
-                     vid.videoWidth*.5,  vid.videoHeight*.7,  0,0,W2,H2);
-    const d = tc.getImageData(0,0,W2,H2).data;
-    let sum=0, lS=0, rS=0;
+    const W2=64,H2=48,t=document.createElement('canvas');
+    t.width=W2;t.height=H2;
+    const tc=t.getContext('2d');
+    tc.drawImage(vid,vid.videoWidth*.25,vid.videoHeight*.15,vid.videoWidth*.5,vid.videoHeight*.7,0,0,W2,H2);
+    const d=tc.getImageData(0,0,W2,H2).data;
+    let s=0,l=0,r=0;
     for(let i=0;i<W2*H2;i++){
-      const b = .299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
-      sum+=b; (i%W2<W2/2 ? lS : rS)+=b;
+      const b=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
+      s+=b;(i%W2<W2/2?l:r)+=b;
     }
-    const avg=sum/(W2*H2), even=avg>0?Math.abs(lS-rS)/(avg*W2*H2):0;
-    if      (avg<72)   S.ls='dark';
-    else if (avg>228)  S.ls='bright';
-    else if (even>.30) S.ls='uneven';
-    else               S.ls='ok';
-  } catch{ S.ls='ok'; }
+    const avg=s/(W2*H2),ev=avg>0?Math.abs(l-r)/(avg*W2*H2):0;
+    gLs=avg<72?'dark':avg>228?'bright':ev>.30?'uneven':'ok';
+  } catch(e){ gLs='ok'; }
 
-  // Face detection via MediaPipe
-  if (faceDetector && S.modelReady) {
-    try { await faceDetector.send({ image: vid }); }
-    catch{ S.fs='na'; S.hs='na'; updateSbar(); updateHint(); }
-  } else if (!S.modelReady && S.fs==='init') {
-    S.fs='na'; S.hs='na';
-    updateSbar(); updateHint();
+  // Face detection (optional, graceful fallback)
+  if (gModelReady && window._fd) {
+    try { await window._fd.send({image:vid}); }
+    catch(e){ gFs='na'; gHs='na'; }
+  } else if (!gModelReady && gFs==='init') {
+    gFs='na'; gHs='na';
   }
-  // brightness-only update (face updated in onFaceResults callback)
-  if (!S.modelReady) { updateSbar(); updateHint(); }
 
+  updateStatus();
   scheduleAnalysis(700);
 }
 
-// ─── CAPTURE ─────────────────────────────────────────────────────────
-async function doCapture() {
-  if (!vid || vid.readyState<2) return;
-  S.captured = true;
-  cancelAnimationFrame(rafId);
-  clearTimeout(analyzeTimer);
+// ─── MediaPipe face_detection (loaded async, non-blocking) ────────────
+function loadFaceModel() {
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js';
+  s.onload=() => {
+    try {
+      const fd=new FaceDetection({
+        locateFile: f=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/'+f
+      });
+      fd.setOptions({model:'short',minDetectionConfidence:0.5});
+      fd.onResults(onFaceResults);
+      window._fd=fd;
+      gModelReady=true;
+    } catch(e){ console.warn('FD init:',e); }
+  };
+  s.onerror=()=>console.warn('FD script load failed — running without face detection');
+  document.head.appendChild(s);
+}
 
-  // Flash effect
-  const fl = document.createElement('div'); fl.className='flash';
-  vfEl.appendChild(fl); setTimeout(()=>fl.remove(), 280);
+function onFaceResults(res) {
+  if (gCaptured) return;
+  if (!res.detections||!res.detections.length){ gFs='none'; gHs='na'; updateStatus(); return; }
+  const det=res.detections[0], bb=det.boundingBox, lm=det.landmarks;
+  const cx=bb.xCenter,cy=bb.yCenter,nh=bb.height,nw=bb.width;
+  // Position
+  gFs=nh<.28?'far':nh>.84?'close':Math.abs(cx-.5)>.16||Math.abs(cy-.47)>.17?'center':'ok';
+  // Head pose
+  if(lm&&lm.length>=4){
+    const re=lm[0],le=lm[1],nose=lm[2],mouth=lm[3];
+    const roll=Math.atan2(le.y-re.y,le.x-re.x)*180/Math.PI;
+    const yaw=(nose.x-(re.x+le.x)/2)/nw;
+    const e2n=(nose.y-(re.y+le.y)/2)/nh, n2m=(mouth.y-nose.y)/nh;
+    gHs=roll>9?'tilt_r':roll<-9?'tilt_l':yaw>.09?'turn_r':yaw<-.09?'turn_l':
+        e2n<.18||n2m>.42?'up':e2n>.44||n2m<.10?'down':'ok';
+  } else gHs='na';
+  updateStatus();
+}
 
-  // Processing overlay
-  const po = document.createElement('div'); po.className='proc';
-  const bgLabel = S.bgRemove ? 'удаление фона · ' : '';
-  po.innerHTML = `<div class="spin"></div><p>ОБРАБОТКА</p><small>${bgLabel}коррекция света</small>`;
+// ─── Status / hint ────────────────────────────────────────────────────
+const PCFG={
+  face:{init:['#555','Поз. лица...'],na:['#888','Позиция — вручную'],
+    none:['#ef4444','Лицо не найдено'],close:['#f97316','Отойдите дальше'],
+    far:['#f97316','Подойдите ближе'],center:['#f97316','Выровняйте центр'],ok:['#4ade80','Позиция ✓']},
+  head:{init:['#555','Голова...'],na:['#888','Голова — вручную'],
+    tilt_l:['#f97316','Наклон влево'],tilt_r:['#f97316','Наклон вправо'],
+    turn_l:['#f97316','Повернитесь вправо'],turn_r:['#f97316','Повернитесь влево'],
+    up:['#f97316','Опустите подбородок'],down:['#f97316','Поднимите подбородок'],ok:['#4ade80','Голова ✓']},
+  light:{init:['#555','Свет...'],dark:['#ef4444','Слишком темно'],
+    bright:['#f97316','Слишком ярко'],uneven:['#f97316','Неравный свет'],ok:['#4ade80','Свет ✓']},
+};
+
+function setPill(id, type, status){
+  const el=document.getElementById(id); if(!el)return;
+  const [dot,text]=(PCFG[type][status]||PCFG[type].init);
+  el.style.borderColor=dot==='#4ade80'?'rgba(74,222,128,.22)':'rgba(255,255,255,.07)';
+  el.innerHTML=`<div class="sd" style="background:${dot}"></div><span class="st" style="color:${dot}">${text}</span>`;
+}
+
+function isReady(){return gFs==='ok'&&(gHs==='ok'||gHs==='na')&&gLs==='ok';}
+
+function setHint(txt,cls){hintEl.textContent=txt;hintEl.className='hint'+(cls?' '+cls:'');}
+
+function updateStatus(){
+  setPill('sp0','face',gFs); setPill('sp1','head',gHs); setPill('sp2','light',gLs);
+  const f=gFs,h=gHs,l=gLs;
+  if(f==='init')       setHint('Инициализация...');
+  else if(f==='none')  setHint('Встаньте перед камерой','warn');
+  else if(f==='close') setHint('Отойдите дальше','warn');
+  else if(f==='far')   setHint('Подойдите ближе','warn');
+  else if(f==='center')setHint('Выровняйте лицо по центру','warn');
+  else if(h==='tilt_l')setHint('Наклоните голову вправо','warn');
+  else if(h==='tilt_r')setHint('Наклоните голову влево','warn');
+  else if(h==='turn_l')setHint('Повернитесь правее','warn');
+  else if(h==='turn_r')setHint('Повернитесь левее','warn');
+  else if(h==='up')    setHint('Опустите подбородок','warn');
+  else if(h==='down')  setHint('Поднимите подбородок','warn');
+  else if(l==='dark')  setHint('Добавьте освещения','warn');
+  else if(l==='bright')setHint('Уменьшите яркость','warn');
+  else if(l==='uneven')setHint('Нужен свет с обеих сторон','warn');
+  else if(isReady())   setHint('✓ Готово — нажмите кнопку','ok');
+  else                 setHint('Совместите лицо с овалом');
+  capBtn.className='cbtn'+(isReady()?' rdy':'');
+}
+
+// ─── Capture ──────────────────────────────────────────────────────────
+async function doCapture(){
+  if(!vid.videoWidth) return;
+  gCaptured=true;
+  cancelAnimationFrame(gRaf); clearTimeout(gTimer);
+
+  // Flash
+  const fl=document.createElement('div'); fl.className='flash';
+  vfEl.appendChild(fl); setTimeout(()=>fl.remove(),280);
+
+  // Proc overlay
+  const po=document.createElement('div'); po.className='proc';
+  po.innerHTML=`<div class="spin"></div><p>ОБРАБОТКА</p><small>${gBgRemove?'удаление фона · ':''}коррекция света</small>`;
   vfEl.appendChild(po);
-  await new Promise(r=>setTimeout(r, 80));
+  await tick(80);
 
-  // Crop to document aspect ratio
-  const {aspect} = TYPES[S.type];
+  // Crop to document aspect
+  const {aspect}=TYPES[gType];
   const vw=vid.videoWidth, vh=vid.videoHeight;
-  let cW, cH;
-  if (vw/vh > aspect) { cH=vh; cW=(vh*aspect)|0; }
-  else                { cW=vw; cH=(vw/aspect)|0; }
-  const srcX = ((vw-cW)/2)|0, srcY = ((vh-cH)/2)|0;
-
+  let cW,cH;
+  if(vw/vh>aspect){cH=vh;cW=(vh*aspect)|0;}else{cW=vw;cH=(vw/aspect)|0;}
+  const sx=((vw-cW)/2)|0, sy=((vh-cH)/2)|0;
   capCv.width=cW; capCv.height=cH;
 
-  // Mirror front camera
-  if (S.facing==='user') {
-    capCtx.save(); capCtx.translate(cW,0); capCtx.scale(-1,1);
-    capCtx.drawImage(vid, srcX, srcY, cW, cH, 0, 0, cW, cH);
+  // Mirror front cam
+  if(gFacing==='user'){
+    capCtx.save();capCtx.translate(cW,0);capCtx.scale(-1,1);
+    capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);
     capCtx.restore();
   } else {
-    capCtx.drawImage(vid, srcX, srcY, cW, cH, 0, 0, cW, cH);
+    capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);
   }
 
-  // Post-processing
+  // Post-process
   try {
-    if (S.bgRemove && removeBackground) {
-      po.querySelector('small').textContent = 'удаление фона...';
-      const blob = await removeBackground(capCv, {
-        model: 'small',
-        output: { format:'image/png', quality:0.92 },
-      });
-      // Composite: white bg + person mask
-      const url = URL.createObjectURL(blob);
-      await new Promise((res,rej) => {
-        const img = new Image();
-        img.onload = () => {
-          capCtx.fillStyle = '#ffffff';
-          capCtx.fillRect(0,0,cW,cH);
+    if(gBgRemove&&gRemoveBg){
+      po.querySelector('small').textContent='удаление фона...';
+      const blob=await gRemoveBg(capCv,{model:'small',output:{format:'image/png',quality:.92}});
+      const url=URL.createObjectURL(blob);
+      await new Promise((res,rej)=>{
+        const img=new Image();
+        img.onload=()=>{
+          capCtx.fillStyle='#fff'; capCtx.fillRect(0,0,cW,cH);
           capCtx.drawImage(img,0,0,cW,cH);
-          URL.revokeObjectURL(url);
-          res();
+          URL.revokeObjectURL(url); res();
         };
-        img.onerror = rej;
-        img.src = url;
+        img.onerror=rej; img.src=url;
       });
     } else {
-      // Flood-fill fallback (fast, works on uniform bg)
-      bgFloodFill(capCtx, cW, cH);
+      bgFloodFill(capCtx,cW,cH);
     }
-    // Always normalise face brightness
-    normaliseBrightness(capCtx, cW, cH);
-  } catch(e) { console.warn('Post-proc:', e); }
+    normLight(capCtx,cW,cH);
+  } catch(e){ console.warn('post:',e); }
 
-  const url = capCv.toDataURL('image/jpeg', 0.95);
+  const url=capCv.toDataURL('image/jpeg',.95);
   po.remove();
 
-  // Show preview
-  vfEl.innerHTML =
-    `<div class="prev-wrap"><img src="${url}" alt="preview"/>
-     <div class="prev-badge">✓ Фото готово</div></div>`;
+  // Show result
+  vid.style.display='none';
+  ov.style.display='none';
+  hintEl.style.display='none';
+  vfEl.insertAdjacentHTML('beforeend',
+    `<div class="prev-wrap"><img src="${url}"/><div class="prev-badge">✓ Фото готово</div></div>`);
 
-  // Swap controls
-  document.getElementById('ctrl').innerHTML =
+  document.getElementById('ctrl').innerHTML=
     `<button class="abtn" onclick="retake()">↩ Переснять</button>
      <button class="abtn p" onclick="dlPhoto('${url}')">↓ Сохранить</button>`;
   document.getElementById('sbar').style.opacity='.35';
 }
 
-// ─── Background removal: flood-fill from edges ────────────────────────
-function bgFloodFill(c, w, h) {
-  const id = c.getImageData(0,0,w,h), d = id.data;
+// ─── BG flood-fill ────────────────────────────────────────────────────
+function bgFloodFill(c,w,h){
+  const id=c.getImageData(0,0,w,h),d=id.data;
   let rS=0,gS=0,bS=0,cnt=0;
-  const add = (x,y) => { const i=(y*w+x)*4; rS+=d[i]; gS+=d[i+1]; bS+=d[i+2]; cnt++; };
-  for(let x=0;x<w;x++){ add(x,0);add(x,1);add(x,h-1);add(x,h-2); }
-  for(let y=2;y<h-2;y++){ add(0,y);add(1,y);add(w-1,y);add(w-2,y); }
-  const bgR=rS/cnt, bgG=gS/cnt, bgB=bS/cnt, thr=65;
-  const vis=new Uint8Array(w*h), q=[];
+  const add=(x,y)=>{const i=(y*w+x)*4;rS+=d[i];gS+=d[i+1];bS+=d[i+2];cnt++;};
+  for(let x=0;x<w;x++){add(x,0);add(x,1);add(x,h-1);add(x,h-2);}
+  for(let y=2;y<h-2;y++){add(0,y);add(1,y);add(w-1,y);add(w-2,y);}
+  const bgR=rS/cnt,bgG=gS/cnt,bgB=bS/cnt,thr=65;
+  const vis=new Uint8Array(w*h),q=[];
   function enq(x,y){
     if(x<0||x>=w||y<0||y>=h)return;
-    const idx=y*w+x; if(vis[idx])return; vis[idx]=1;
-    const i=idx*4, dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
-    if(Math.sqrt(dr*dr+dg*dg+db*db)<thr) q.push(idx);
+    const idx=y*w+x;if(vis[idx])return;vis[idx]=1;
+    const i=idx*4,dr=d[i]-bgR,dg=d[i+1]-bgG,db=d[i+2]-bgB;
+    if(Math.sqrt(dr*dr+dg*dg+db*db)<thr)q.push(idx);
   }
-  for(let x=0;x<w;x++){ enq(x,0); enq(x,h-1); }
-  for(let y=1;y<h-1;y++){ enq(0,y); enq(w-1,y); }
+  for(let x=0;x<w;x++){enq(x,0);enq(x,h-1);}
+  for(let y=1;y<h-1;y++){enq(0,y);enq(w-1,y);}
   while(q.length){
     const idx=q.pop();
-    d[idx*4]=255; d[idx*4+1]=255; d[idx*4+2]=255;
-    const x=idx%w, y=(idx/w)|0;
+    d[idx*4]=255;d[idx*4+1]=255;d[idx*4+2]=255;
+    const x=idx%w,y=(idx/w)|0;
     enq(x+1,y);enq(x-1,y);enq(x,y+1);enq(x,y-1);
   }
   c.putImageData(id,0,0);
 }
 
-// ─── Brightness normalisation ─────────────────────────────────────────
-function normaliseBrightness(c, w, h) {
-  const id=c.getImageData(0,0,w,h), d=id.data;
-  const fx=(w*.18)|0, fy=(h*.05)|0, fw=(w*.64)|0, fh=(h*.78)|0;
-  let sum=0, cnt=0;
+// ─── Light normalisation ──────────────────────────────────────────────
+function normLight(c,w,h){
+  const id=c.getImageData(0,0,w,h),d=id.data;
+  const fx=w*.18|0,fy=h*.05|0,fw=w*.64|0,fh=h*.78|0;
+  let s=0,n=0;
   for(let y=fy;y<Math.min(fy+fh,h);y++)
     for(let x=fx;x<Math.min(fx+fw,w);x++){
       const i=(y*w+x)*4;
-      if(d[i]>250&&d[i+1]>250&&d[i+2]>250) continue;
-      sum+=.299*d[i]+.587*d[i+1]+.114*d[i+2]; cnt++;
+      if(d[i]>250&&d[i+1]>250&&d[i+2]>250)continue;
+      s+=.299*d[i]+.587*d[i+1]+.114*d[i+2];n++;
     }
-  if(!cnt||sum===0) return;
-  const mult = 158 / (sum/cnt);
-  if(Math.abs(mult-1) < 0.06) return;  // skip tiny corrections
-  const cl = v => Math.max(0,Math.min(255,v|0));
+  if(!n||!s)return;
+  const m=158/(s/n);
+  if(Math.abs(m-1)<.06)return;
+  const cl=v=>Math.max(0,Math.min(255,v|0));
   for(let y=fy;y<Math.min(fy+fh,h);y++)
     for(let x=fx;x<Math.min(fx+fw,w);x++){
       const i=(y*w+x)*4;
-      if(d[i]>250&&d[i+1]>250&&d[i+2]>250) continue;
-      d[i]=cl(d[i]*mult); d[i+1]=cl(d[i+1]*mult); d[i+2]=cl(d[i+2]*mult);
+      if(d[i]>250&&d[i+1]>250&&d[i+2]>250)continue;
+      d[i]=cl(d[i]*m);d[i+1]=cl(d[i+1]*m);d[i+2]=cl(d[i+2]*m);
     }
   c.putImageData(id,0,0);
 }
 
-// ─── Load @imgly/background-removal lazily ───────────────────────────
-async function loadBgModel() {
-  if (S.bgModelLoaded) return true;
-  try {
-    const mod = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/index.mjs');
-    removeBackground = mod.removeBackground;
-    S.bgModelLoaded = true;
-    return true;
-  } catch(e) {
-    console.warn('@imgly/background-removal load failed:', e);
-    return false;
+// ─── Controls ─────────────────────────────────────────────────────────
+function setType(k){
+  gType=k;
+  document.querySelectorAll('.pill').forEach((b,i)=>{b.className='pill'+(Object.keys(TYPES)[i]===k?' on':'');});
+  const t=TYPES[k];
+  document.getElementById('subdesc').textContent=`${t.size} · ${t.desc}`;
+  renderReqs();
+}
+
+function flipCam(){gFacing=gFacing==='user'?'environment':'user';retake();}
+
+function toggleBg(){
+  gBgRemove=!gBgRemove;
+  document.getElementById('bgBtn').className='icobtn'+(gBgRemove?' on':'');
+  if(gBgRemove&&!gBgLoaded){
+    import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/index.mjs')
+      .then(m=>{gRemoveBg=m.removeBackground;gBgLoaded=true;})
+      .catch(e=>{console.warn('bg lib:',e);gBgRemove=false;
+        document.getElementById('bgBtn').className='icobtn';});
   }
 }
 
-// ─── User controls ────────────────────────────────────────────────────
-function setType(k) {
-  S.type = k;
-  renderReqGrid();
-}
-
-function flipCam() {
-  S.facing = S.facing==='user' ? 'environment' : 'user';
-  resetViewfinder();
-  startCamera();
-}
-
-function toggleBg() {
-  S.bgRemove = !S.bgRemove;
-  const btn = document.getElementById('bgBtn');
-  if (btn) btn.className = 'icobtn' + (S.bgRemove ? ' on' : '');
-  if (S.bgRemove && !S.bgModelLoaded) {
-    // Pre-load the model so first capture isn't slow
-    loadBgModel().then(ok => {
-      if (!ok) { S.bgRemove=false; if(btn) btn.className='icobtn'; }
-    });
-  }
-}
-
-function retake() {
-  S.captured = false;
-  resetViewfinder();
-  showCaptureControls();
-  document.getElementById('sbar').style.opacity='1';
-  startCamera();
-}
-
-function dlPhoto(url) {
-  const a = document.createElement('a');
-  a.href=url; a.download=`doc_photo_${Date.now()}.jpg`; a.click();
-}
-
-function resetViewfinder() {
-  vfEl.innerHTML = '<canvas id="cv"></canvas><div id="hint" class="hint">Запуск камеры...</div>';
-  // Reassign cv/ctx to new DOM elements
-  cv  = document.getElementById('cv');
-  ctx = cv.getContext('2d');
-}
-
-function showCaptureControls() {
+function retake(){
+  gCaptured=false;
+  vid.style.display=''; ov.style.display=''; hintEl.style.display='';
+  document.querySelector('.prev-wrap')?.remove();
   document.getElementById('ctrl').innerHTML=`
-    <button class="icobtn" onclick="flipCam()" title="Переключить камеру">
+    <button class="icobtn" onclick="flipCam()">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 7h-9"/><path d="M14 17H5"/>
         <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
       </svg>
     </button>
     <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
-    <button class="icobtn${S.bgRemove?' on':''}" id="bgBtn" onclick="toggleBg()" title="Белый фон при съёмке">🪄</button>`;
+    <button class="icobtn${gBgRemove?' on':''}" id="bgBtn" onclick="toggleBg()">🪄</button>`;
+  document.getElementById('sbar').style.opacity='1';
+  startCamera();
 }
 
-// ─── Boot ─────────────────────────────────────────────────────────────
-// 1. Camera starts FIRST → immediate visual feedback
-// 2. Model loads ASYNC → doesn't block render
-startCamera();
-loadFaceModel();
+function dlPhoto(url){
+  const a=document.createElement('a');a.href=url;a.download=`doc_photo_${Date.now()}.jpg`;a.click();
+}
+
+function renderReqs(){
+  const t=TYPES[gType];
+  document.getElementById('rg').innerHTML=REQS.map(([k,v])=>
+    `<div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>`
+  ).join('');
+}
+
+function showErr(msg){
+  vfEl.insertAdjacentHTML('beforeend',`<div class="cam-err">${msg.replace(/\n/g,'<br>')}</div>`);
+}
+
+function tick(ms){return new Promise(r=>setTimeout(r,ms));}
 </script>
 </body>
 </html>
