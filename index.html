@@ -14,106 +14,121 @@ body{font-family:'Courier New',monospace;-webkit-tap-highlight-color:transparent
 button{cursor:pointer;font-family:inherit;background:none;border:none;outline:none;-webkit-appearance:none}
 button:active{transform:scale(.95);opacity:.8}
 
-.app{height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
+.app{height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto}
 
-.hdr{flex-shrink:0;padding:9px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:#000;z-index:2}
+/* Header */
+.hdr{flex-shrink:0;padding:9px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:#000}
 .hdr-title{font-size:10px;letter-spacing:.16em;color:#F5C842;font-weight:700;margin-bottom:7px}
 .pills{display:flex;gap:5px}
-.pill{border:1px solid rgba(232,213,163,.2);border-radius:3px;color:rgba(232,213,163,.45);font-size:10px;padding:4px 10px;letter-spacing:.04em;transition:all .15s}
+.pill{border:1px solid rgba(232,213,163,.2);border-radius:3px;color:rgba(232,213,163,.45);
+      font-size:10px;padding:4px 10px;letter-spacing:.04em;transition:all .15s}
 .pill.on{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 .subdesc{font-size:9px;color:rgba(232,213,163,.32);margin-top:4px;letter-spacing:.06em}
 
 /* Viewfinder */
-.vf{flex:1;position:relative;background:#000;overflow:hidden;min-height:0}
+.vf{flex:1;position:relative;background:#111;overflow:hidden;min-height:0}
 
-/* THE FIX: video IS in the DOM, covers the viewfinder, canvas overlays it */
+/* Video fills the viewfinder */
 #vid{
-  position:absolute;inset:0;
+  position:absolute;top:0;left:0;
   width:100%;height:100%;
   object-fit:cover;
   display:block;
+  background:#111;
 }
 .mirror{transform:scaleX(-1)}
 
-/* Canvas for overlay only (transparent bg) */
-#ov{
-  position:absolute;inset:0;
-  width:100%;height:100%;
-  pointer-events:none;
-}
+/* Overlay canvas — transparent, pointer-events:none */
+#ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 
+/* Hint */
 #hint{
   position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
-  background:rgba(0,0,0,.8);font-size:10px;padding:6px 16px;border-radius:20px;
+  background:rgba(0,0,0,.82);font-size:10px;padding:6px 16px;border-radius:20px;
   pointer-events:none;white-space:nowrap;letter-spacing:.05em;
   border:1px solid rgba(232,213,163,.14);color:rgba(232,213,163,.85);
-  max-width:92%;text-align:center;z-index:2;
+  max-width:92%;text-align:center;z-index:3;
 }
 #hint.ok  {color:#4ade80;border-color:rgba(74,222,128,.4)}
 #hint.warn{color:#fb923c;border-color:rgba(251,146,60,.35)}
 
-.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:9;animation:fl .2s forwards}
+/* Flash */
+.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:9;
+       animation:fl .2s forwards}
 @keyframes fl{to{opacity:0}}
 
+/* Processing */
 .proc{position:absolute;inset:0;background:rgba(0,0,0,.92);z-index:20;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
 .spin{width:36px;height:36px;border:3px solid rgba(245,200,66,.15);
-  border-top-color:#F5C842;border-radius:50%;animation:sp .7s linear infinite}
+      border-top-color:#F5C842;border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .proc p{color:#E8D5A3;font-size:11px;letter-spacing:.12em}
 .proc small{font-size:9px;color:rgba(232,213,163,.4)}
 
+/* Preview */
 .prev-wrap{position:absolute;inset:0;z-index:15;display:flex;align-items:center;
-  justify-content:center;background:#111}
-.prev-wrap img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+           justify-content:center;background:#111}
+.prev-wrap img{max-width:100%;max-height:100%;object-fit:contain}
 .prev-badge{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.8);
-  border:1px solid #4ade80;border-radius:4px;padding:4px 10px;font-size:10px;color:#fff}
+            border:1px solid #4ade80;border-radius:4px;padding:4px 10px;
+            font-size:10px;color:#fff}
 
+/* Error */
 .cam-err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:12px;padding:28px;background:rgba(0,0,0,.92);
-  font-size:13px;text-align:center;line-height:1.6;z-index:10}
+         justify-content:center;gap:14px;padding:28px;background:rgba(0,0,0,.92);
+         font-size:12px;text-align:center;line-height:1.7;z-index:10;
+         color:rgba(232,213,163,.9)}
+.cam-err b{font-size:32px}
 
 /* Status bar */
 #sbar{flex-shrink:0;display:flex;gap:4px;padding:5px 8px;
-  background:rgba(0,0,0,.5);border-top:1px solid rgba(232,213,163,.08)}
+      background:rgba(0,0,0,.5);border-top:1px solid rgba(232,213,163,.08)}
 .sp{flex:1;min-width:0;display:flex;align-items:center;gap:4px;
-  padding:4px 6px;border-radius:3px;background:rgba(255,255,255,.04);
-  border:1px solid rgba(255,255,255,.07);font-size:8.5px;letter-spacing:.04em}
+    padding:4px 6px;border-radius:3px;background:rgba(255,255,255,.04);
+    border:1px solid rgba(255,255,255,.07);font-size:8.5px;letter-spacing:.04em}
 .sd{width:6px;height:6px;min-width:6px;border-radius:50%}
 .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Controls */
 #ctrl{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;
-  padding:12px 24px;background:#0E0E12;border-top:1px solid rgba(232,213,163,.08);gap:10px}
+      padding:12px 24px;background:#0E0E12;
+      border-top:1px solid rgba(232,213,163,.08);gap:10px}
 .cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;
-  background:transparent;display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;transition:border-color .25s,box-shadow .25s;
-  box-shadow:0 0 14px rgba(245,200,66,.14)}
+      background:transparent;display:flex;align-items:center;justify-content:center;
+      flex-shrink:0;box-shadow:0 0 14px rgba(245,200,66,.14);
+      transition:border-color .25s,box-shadow .25s}
 .cbtn.rdy{border-color:#4ade80;animation:rp 1.6s ease-in-out infinite}
 @keyframes rp{0%,100%{box-shadow:0 0 14px rgba(74,222,128,.2)}50%{box-shadow:0 0 30px rgba(74,222,128,.6)}}
-.ci{width:48px;height:48px;border-radius:50%;background:#F5C842;transition:background .25s;pointer-events:none}
+.ci{width:48px;height:48px;border-radius:50%;background:#F5C842;
+    transition:background .25s;pointer-events:none}
 .cbtn.rdy .ci{background:#4ade80}
 .icobtn{width:42px;height:42px;border-radius:50%;background:rgba(232,213,163,.05);
-  border:1px solid rgba(232,213,163,.2);color:#E8D5A3;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
+        border:1px solid rgba(232,213,163,.2);color:#E8D5A3;
+        display:flex;align-items:center;justify-content:center;
+        flex-shrink:0;font-size:18px}
 .icobtn.on{border-color:#60a5fa;background:rgba(96,165,250,.1)}
-.abtn{flex:1;padding:11px 0;background:transparent;border:1px solid rgba(232,213,163,.25);
-  color:#E8D5A3;border-radius:4px;font-size:11px;letter-spacing:.1em}
+.abtn{flex:1;padding:11px 0;background:transparent;
+      border:1px solid rgba(232,213,163,.25);color:#E8D5A3;
+      border-radius:4px;font-size:11px;letter-spacing:.1em}
 .abtn.p{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 
 /* Req */
-#req{flex-shrink:0;padding:7px 14px 10px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.25)}
+#req{flex-shrink:0;padding:7px 14px 10px;
+     border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.25)}
 #req h4{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.28);margin-bottom:5px}
 .rg{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
-.ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;border-bottom:1px solid rgba(232,213,163,.06)}
+.ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;
+    border-bottom:1px solid rgba(232,213,163,.06)}
 .rk{color:rgba(232,213,163,.35)}.rv{color:rgba(232,213,163,.7);text-align:right}
 </style>
 </head>
 <body>
 <div class="app">
+
   <div class="hdr">
     <div class="hdr-title">⊞ ФОТО НА ДОКУМЕНТЫ РФ</div>
-    <div class="pills" id="pills">
+    <div class="pills">
       <button class="pill on" onclick="setType('passport')">Паспорт / Загран</button>
       <button class="pill"    onclick="setType('visa')">Виза</button>
       <button class="pill"    onclick="setType('zagran')">Воен. билет</button>
@@ -122,11 +137,9 @@ button:active{transform:scale(.95);opacity:.8}
   </div>
 
   <div class="vf" id="vf">
-    <!-- VIDEO IS IN THE DOM — required for Android Chrome to render -->
     <video id="vid" autoplay playsinline muted></video>
-    <!-- Overlay canvas (transparent, draws guide lines on top of video) -->
     <canvas id="ov"></canvas>
-    <div id="hint" class="hint">Запуск камеры...</div>
+    <div id="hint" class="hint">Нажмите для запуска камеры</div>
   </div>
 
   <div id="sbar">
@@ -137,7 +150,8 @@ button:active{transform:scale(.95);opacity:.8}
 
   <div id="ctrl">
     <button class="icobtn" onclick="flipCam()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 7h-9"/><path d="M14 17H5"/>
         <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
       </svg>
@@ -154,23 +168,31 @@ button:active{transform:scale(.95);opacity:.8}
 
 <script>
 'use strict';
+/* ───────────────────────────────────────────────────────
+   Robust camera start strategy:
+   1. Try getUserMedia with ideal constraints
+   2. Fallback to {video:true} if that fails
+   3. Listen for loadedmetadata + canplay + playing
+   4. Polling fallback: check videoWidth every 200ms
+   5. If nothing after 8s — show helpful error
+─────────────────────────────────────────────────────── */
 
-const TYPES = {
-  passport:{ label:'Паспорт / Загран', size:'35×45 мм', aspect:35/45, desc:'Загранпаспорт, ВНЖ, СНИЛС' },
-  visa:    { label:'Виза',             size:'35×45 мм', aspect:35/45, desc:'Шенген, US, UK, Китай' },
-  zagran:  { label:'Воен. билет',      size:'30×40 мм', aspect:30/40, desc:'Военный билет, приписное' },
+const TYPES={
+  passport:{label:'Паспорт / Загран',size:'35×45 мм',aspect:35/45,desc:'Загранпаспорт, ВНЖ, СНИЛС'},
+  visa:    {label:'Виза',            size:'35×45 мм',aspect:35/45,desc:'Шенген, US, UK, Китай'},
+  zagran:  {label:'Воен. билет',     size:'30×40 мм',aspect:30/40,desc:'Военный билет, приписное'},
 };
 const REQS=[['Размер',null],['Лицо','70–80% высоты'],['Фон','белый / светло-серый'],
             ['Взгляд','прямо в объектив'],['Выражение','нейтральное'],['Качество','без теней, резкое']];
 const FR={ovalCY:.47,ovalH:.74,ovalW:.54,eyeY:.55,chinY:.85,crownY:.11};
 
-// ─── State ───────────────────────────────────────────────────────────
+// State
 let gType='passport', gFacing='user', gBgRemove=false, gCaptured=false;
 let gFs='init', gHs='init', gLs='init';
-let gModelReady=false, gBgLoaded=false, gRemoveBg=null;
-let gStream=null, gRaf=null, gTimer=null;
+let gStream=null, gRaf=null, gAnalyzeTimer=null, gPollTimer=null;
+let gVideoReady=false, gModelReady=false, gBgLoaded=false, gRemoveBg=null;
 
-// ─── DOM ─────────────────────────────────────────────────────────────
+// DOM
 const vid    = document.getElementById('vid');
 const ov     = document.getElementById('ov');
 const octx   = ov.getContext('2d');
@@ -180,126 +202,169 @@ const capBtn = document.getElementById('capBtn');
 const capCv  = document.createElement('canvas');
 const capCtx = capCv.getContext('2d');
 
-// ─── Init ─────────────────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────
 renderReqs();
+// Start camera automatically (page is HTTPS via GitHub Pages = allowed)
 startCamera();
-// Load MediaPipe face detection after a short delay (non-blocking)
-setTimeout(loadFaceModel, 2000);
+// Load face model after camera is up
+setTimeout(loadFaceModel, 3000);
 
-// ─── Camera ──────────────────────────────────────────────────────────
-function startCamera() {
-  if (gStream) gStream.getTracks().forEach(t=>t.stop());
-  cancelAnimationFrame(gRaf); clearTimeout(gTimer);
-  gFs='init'; gHs='init'; gLs='init';
-  setPill('sp0','face','init'); setPill('sp1','head','init'); setPill('sp2','light','init');
+// ── Camera ────────────────────────────────────────────
+async function startCamera() {
+  gVideoReady = false;
+  if (gStream) { gStream.getTracks().forEach(t=>t.stop()); gStream=null; }
+  clearTimeout(gPollTimer);
+  cancelAnimationFrame(gRaf);
+  clearTimeout(gAnalyzeTimer);
+
+  vid.srcObject = null;
+  vid.className = gFacing==='user' ? 'mirror' : '';
   setHint('Запуск камеры...');
 
-  vid.className = gFacing==='user' ? 'mirror' : '';
+  // Try with ideal constraints, then fallback
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:gFacing, width:{ideal:1280}, height:{ideal:720} },
+      audio:false
+    });
+  } catch(e1) {
+    console.warn('Constraint getUserMedia failed:', e1.name, '— trying fallback');
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
+    } catch(e2) {
+      showCamError(e2);
+      return;
+    }
+  }
 
-  navigator.mediaDevices.getUserMedia({
-    video:{ facingMode:gFacing, width:{ideal:1920}, height:{ideal:1080} },
-    audio:false
-  })
-  .then(stream => {
-    gStream = stream;
-    vid.srcObject = stream;
-    // Use 'canplay' — more reliable than loadedmetadata on Android
-    vid.addEventListener('canplay', onVideoReady, {once:true});
-    vid.play().catch(()=>{});
-  })
-  .catch(err => {
-    showErr('📷\nНет доступа к камере.\nРазрешите в настройках браузера.\n'+err.name);
-  });
+  gStream = stream;
+  vid.srcObject = stream;
+
+  // Three event listeners — whichever fires first triggers onVideoReady
+  const onReady = () => { if (!gVideoReady) onVideoReady(); };
+  vid.addEventListener('loadedmetadata', onReady, {once:true});
+  vid.addEventListener('canplay',        onReady, {once:true});
+  vid.addEventListener('playing',        onReady, {once:true});
+
+  // Polling fallback: if no event fires within 2s, check videoWidth directly
+  let pollCount = 0;
+  const poll = () => {
+    if (gVideoReady) return;
+    if (vid.videoWidth > 0) { onVideoReady(); return; }
+    if (++pollCount < 40) { gPollTimer = setTimeout(poll, 200); }   // 8s total
+    else showCamError({name:'TimeoutError', message:'Камера не ответила за 8 секунд'});
+  };
+  gPollTimer = setTimeout(poll, 500);
+
+  // Try to play (needed on some Android)
+  try { await vid.play(); } catch(e) { console.warn('play():', e); }
 }
 
 function onVideoReady() {
-  startOverlayLoop();
-  scheduleAnalysis(1200);
+  if (gVideoReady) return;
+  gVideoReady = true;
+  clearTimeout(gPollTimer);
+  setHint('Совместите лицо с овалом');
+  startOverlay();
+  scheduleAnalysis(800);
 }
 
-// ─── Overlay loop — draws guide lines on transparent canvas ──────────
-function startOverlayLoop() {
-  function frame() {
+function showCamError(err) {
+  clearTimeout(gPollTimer);
+  let msg = 'Нет доступа к камере.';
+  if (err.name === 'NotAllowedError')  msg = 'Доступ к камере запрещён.\nОткройте Настройки → Приложения → Chrome → Разрешения → Камера → Разрешить.';
+  else if (err.name === 'NotFoundError')   msg = 'Камера не найдена на устройстве.';
+  else if (err.name === 'NotReadableError') msg = 'Камера занята другим приложением.';
+  else if (err.name === 'TimeoutError')    msg = err.message;
+  else msg = `${err.name}: ${err.message}`;
+  vfEl.querySelectorAll('.cam-err').forEach(e=>e.remove());
+  vfEl.insertAdjacentHTML('beforeend',
+    `<div class="cam-err"><b>📷</b>${msg.replace(/\n/g,'<br>')}</div>`);
+}
+
+// ── Overlay loop ──────────────────────────────────────
+function startOverlay() {
+  cancelAnimationFrame(gRaf);
+  const loop = () => {
     if (gCaptured) return;
-    const W = vfEl.clientWidth, H = vfEl.clientHeight;
+    const W=vfEl.clientWidth, H=vfEl.clientHeight;
     if (ov.width!==W||ov.height!==H) { ov.width=W; ov.height=H; }
     octx.clearRect(0,0,W,H);
-    drawGuides(octx, W, H);
-    gRaf = requestAnimationFrame(frame);
-  }
-  gRaf = requestAnimationFrame(frame);
+    drawGuides(W,H);
+    gRaf = requestAnimationFrame(loop);
+  };
+  gRaf = requestAnimationFrame(loop);
 }
 
-// ─── Guide overlay (drawn on transparent canvas over video) ──────────
-function drawGuides(c, W, H) {
-  const {aspect,size} = TYPES[gType];
-  let fH=H*.83, fW=fH*aspect;
-  if (fW>W*.78){fW=W*.78;fH=fW/aspect;}
+// ── Guide drawing ─────────────────────────────────────
+function drawGuides(W,H) {
+  const {aspect,size}=TYPES[gType];
+  let fH=H*.83,fW=fH*aspect;
+  if(fW>W*.78){fW=W*.78;fH=fW/aspect;}
   const fX=(W-fW)/2|0, fY=(H-fH)/2|0;
 
   // Vignette
-  c.fillStyle='rgba(0,0,0,.52)';
-  c.fillRect(0,0,W,fY);
-  c.fillRect(0,fY+fH,W,H-fY-fH);
-  c.fillRect(0,fY,fX,fH);
-  c.fillRect(fX+fW,fY,W-fX-fW,fH);
+  octx.fillStyle='rgba(0,0,0,.52)';
+  octx.fillRect(0,0,W,fY);
+  octx.fillRect(0,fY+fH,W,H-fY-fH);
+  octx.fillRect(0,fY,fX,fH);
+  octx.fillRect(fX+fW,fY,W-fX-fW,fH);
 
-  // Status colours
-  const ok   = gFs==='ok'&&(gHs==='ok'||gHs==='na');
-  const warn = gFs!=='ok'&&gFs!=='init'&&gFs!=='na';
-  const cc   = ok?'#4ade80':'#F5C842';
-  const oc   = ok?'rgba(74,222,128,.85)':warn?'rgba(249,115,22,.8)':'rgba(245,200,66,.55)';
+  // Colours by status
+  const allOk = gFs==='ok'&&(gHs==='ok'||gHs==='na');
+  const anyWarn = gFs!=='ok'&&gFs!=='init'&&gFs!=='na';
+  const cc = allOk?'#4ade80':'#F5C842';
+  const oc = allOk?'rgba(74,222,128,.85)':anyWarn?'rgba(249,115,22,.8)':'rgba(245,200,66,.55)';
 
-  // Frame border
-  c.strokeStyle='rgba(232,213,163,.45)'; c.lineWidth=1.5; c.setLineDash([]);
-  c.strokeRect(fX,fY,fW,fH);
+  // Frame
+  octx.strokeStyle='rgba(232,213,163,.45)';octx.lineWidth=1.5;octx.setLineDash([]);
+  octx.strokeRect(fX,fY,fW,fH);
 
-  // Corner brackets
+  // Corners
   const L=Math.min(fW,fH)*.1|0;
-  c.strokeStyle=cc; c.lineWidth=3; c.lineCap='round';
+  octx.strokeStyle=cc;octx.lineWidth=3;octx.lineCap='round';
   [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]].forEach(([x,y,dx,dy])=>{
-    c.beginPath(); c.moveTo(x+dx*L,y); c.lineTo(x,y); c.lineTo(x,y+dy*L); c.stroke();
+    octx.beginPath();octx.moveTo(x+dx*L,y);octx.lineTo(x,y);octx.lineTo(x,y+dy*L);octx.stroke();
   });
 
-  // Face oval
-  c.strokeStyle=oc; c.lineWidth=2; c.setLineDash([6,4]);
-  c.beginPath();
-  c.ellipse(fX+fW/2, fY+fH*FR.ovalCY, fW*FR.ovalW/2, fH*FR.ovalH/2, 0,0,Math.PI*2);
-  c.stroke();
-  c.setLineDash([]);
+  // Oval
+  octx.strokeStyle=oc;octx.lineWidth=2;octx.setLineDash([6,4]);
+  octx.beginPath();
+  octx.ellipse(fX+fW/2,fY+fH*FR.ovalCY,fW*FR.ovalW/2,fH*FR.ovalH/2,0,0,Math.PI*2);
+  octx.stroke();octx.setLineDash([]);
 
   // Guide lines
-  const eY=fY+fH*FR.eyeY, crY=fY+fH*FR.crownY, chY=fY+fH*FR.chinY;
-  c.lineWidth=1; c.setLineDash([4,6]);
-  c.strokeStyle='rgba(245,200,66,.3)';
-  c.beginPath();c.moveTo(fX+fW*.28,crY);c.lineTo(fX+fW*.72,crY);c.stroke();
-  c.beginPath();c.moveTo(fX+fW*.28,chY);c.lineTo(fX+fW*.72,chY);c.stroke();
-  c.strokeStyle='rgba(100,200,255,.3)';
-  c.beginPath();c.moveTo(fX+fW*.18,eY);c.lineTo(fX+fW*.82,eY);c.stroke();
-  c.setLineDash([]);
+  const eY=fY+fH*FR.eyeY,crY=fY+fH*FR.crownY,chY=fY+fH*FR.chinY;
+  octx.lineWidth=1;octx.setLineDash([4,6]);
+  octx.strokeStyle='rgba(245,200,66,.3)';
+  octx.beginPath();octx.moveTo(fX+fW*.28,crY);octx.lineTo(fX+fW*.72,crY);octx.stroke();
+  octx.beginPath();octx.moveTo(fX+fW*.28,chY);octx.lineTo(fX+fW*.72,chY);octx.stroke();
+  octx.strokeStyle='rgba(100,200,255,.3)';
+  octx.beginPath();octx.moveTo(fX+fW*.18,eY);octx.lineTo(fX+fW*.82,eY);octx.stroke();
+  octx.setLineDash([]);
 
   // Labels
-  if (W-(fX+fW)>36) {
-    const lb=fX+fW+8, fs=Math.max(10,fW*.055|0);
-    c.font=fs+'px monospace';
-    c.fillStyle='rgba(245,200,66,.6)';
-    c.fillText('темя',lb,crY+4); c.fillText('подб.',lb,chY+4);
-    c.fillStyle='rgba(100,200,255,.6)'; c.fillText('глаза',lb,eY+4);
+  if(W-(fX+fW)>36){
+    const lb=fX+fW+8;
+    octx.font='10px monospace';
+    octx.fillStyle='rgba(245,200,66,.6)';
+    octx.fillText('темя',lb,crY+4);octx.fillText('подб.',lb,chY+4);
+    octx.fillStyle='rgba(100,200,255,.6)';octx.fillText('глаза',lb,eY+4);
   }
-  // Size label
-  c.font=Math.max(11,fW*.055|0)+'px monospace';
-  c.fillStyle='rgba(232,213,163,.65)'; c.textAlign='center';
-  c.fillText(size,fX+fW/2,fY-7); c.textAlign='left';
+  octx.font=Math.max(11,fW*.055|0)+'px monospace';
+  octx.fillStyle='rgba(232,213,163,.65)';octx.textAlign='center';
+  octx.fillText(size,fX+fW/2,fY-7);octx.textAlign='left';
 }
 
-// ─── Analysis (brightness + optional face model) ──────────────────────
-function scheduleAnalysis(d){clearTimeout(gTimer);gTimer=setTimeout(runAnalysis,d||700);}
+// ── Analysis ──────────────────────────────────────────
+function scheduleAnalysis(d){clearTimeout(gAnalyzeTimer);gAnalyzeTimer=setTimeout(runAnalysis,d||700);}
 
-async function runAnalysis() {
-  if (gCaptured||!vid.videoWidth) { scheduleAnalysis(500); return; }
+async function runAnalysis(){
+  if(gCaptured||!vid.videoWidth){scheduleAnalysis(500);return;}
 
-  // Brightness (no ML — always works)
-  try {
+  // Brightness
+  try{
     const W2=64,H2=48,t=document.createElement('canvas');
     t.width=W2;t.height=H2;
     const tc=t.getContext('2d');
@@ -312,90 +377,80 @@ async function runAnalysis() {
     }
     const avg=s/(W2*H2),ev=avg>0?Math.abs(l-r)/(avg*W2*H2):0;
     gLs=avg<72?'dark':avg>228?'bright':ev>.30?'uneven':'ok';
-  } catch(e){ gLs='ok'; }
+  }catch(e){gLs='ok';}
 
-  // Face detection (optional, graceful fallback)
-  if (gModelReady && window._fd) {
-    try { await window._fd.send({image:vid}); }
-    catch(e){ gFs='na'; gHs='na'; }
-  } else if (!gModelReady && gFs==='init') {
-    gFs='na'; gHs='na';
+  // Face detection
+  if(gModelReady&&window._fd){
+    try{await window._fd.send({image:vid});}
+    catch(e){gFs='na';gHs='na';}
+  } else if(!gModelReady&&gFs==='init'){
+    gFs='na';gHs='na';
   }
 
   updateStatus();
   scheduleAnalysis(700);
 }
 
-// ─── MediaPipe face_detection (loaded async, non-blocking) ────────────
-function loadFaceModel() {
+// ── Face detection model ──────────────────────────────
+function loadFaceModel(){
   const s=document.createElement('script');
   s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js';
-  s.onload=() => {
-    try {
-      const fd=new FaceDetection({
-        locateFile: f=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/'+f
-      });
+  s.onload=()=>{
+    try{
+      const fd=new FaceDetection({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/'+f});
       fd.setOptions({model:'short',minDetectionConfidence:0.5});
-      fd.onResults(onFaceResults);
-      window._fd=fd;
-      gModelReady=true;
-    } catch(e){ console.warn('FD init:',e); }
+      fd.onResults(r=>{
+        if(gCaptured)return;
+        if(!r.detections||!r.detections.length){gFs='none';gHs='na';updateStatus();return;}
+        const det=r.detections[0],bb=det.boundingBox,lm=det.landmarks;
+        const cx=bb.xCenter,cy=bb.yCenter,nh=bb.height,nw=bb.width;
+        gFs=nh<.28?'far':nh>.84?'close':Math.abs(cx-.5)>.16||Math.abs(cy-.47)>.17?'center':'ok';
+        if(lm&&lm.length>=4){
+          const re=lm[0],le=lm[1],nose=lm[2],mouth=lm[3];
+          const roll=Math.atan2(le.y-re.y,le.x-re.x)*180/Math.PI;
+          const yaw=(nose.x-(re.x+le.x)/2)/nw;
+          const e2n=(nose.y-(re.y+le.y)/2)/nh,n2m=(mouth.y-nose.y)/nh;
+          gHs=roll>9?'tilt_r':roll<-9?'tilt_l':yaw>.09?'turn_r':yaw<-.09?'turn_l':
+              e2n<.18||n2m>.42?'up':e2n>.44||n2m<.10?'down':'ok';
+        }else{gHs='na';}
+        updateStatus();
+      });
+      window._fd=fd;gModelReady=true;
+    }catch(e){console.warn('FD init:',e);}
   };
-  s.onerror=()=>console.warn('FD script load failed — running without face detection');
+  s.onerror=()=>console.warn('FD load failed');
   document.head.appendChild(s);
 }
 
-function onFaceResults(res) {
-  if (gCaptured) return;
-  if (!res.detections||!res.detections.length){ gFs='none'; gHs='na'; updateStatus(); return; }
-  const det=res.detections[0], bb=det.boundingBox, lm=det.landmarks;
-  const cx=bb.xCenter,cy=bb.yCenter,nh=bb.height,nw=bb.width;
-  // Position
-  gFs=nh<.28?'far':nh>.84?'close':Math.abs(cx-.5)>.16||Math.abs(cy-.47)>.17?'center':'ok';
-  // Head pose
-  if(lm&&lm.length>=4){
-    const re=lm[0],le=lm[1],nose=lm[2],mouth=lm[3];
-    const roll=Math.atan2(le.y-re.y,le.x-re.x)*180/Math.PI;
-    const yaw=(nose.x-(re.x+le.x)/2)/nw;
-    const e2n=(nose.y-(re.y+le.y)/2)/nh, n2m=(mouth.y-nose.y)/nh;
-    gHs=roll>9?'tilt_r':roll<-9?'tilt_l':yaw>.09?'turn_r':yaw<-.09?'turn_l':
-        e2n<.18||n2m>.42?'up':e2n>.44||n2m<.10?'down':'ok';
-  } else gHs='na';
-  updateStatus();
-}
-
-// ─── Status / hint ────────────────────────────────────────────────────
+// ── Status ────────────────────────────────────────────
 const PCFG={
-  face:{init:['#555','Поз. лица...'],na:['#888','Позиция — вручную'],
-    none:['#ef4444','Лицо не найдено'],close:['#f97316','Отойдите дальше'],
-    far:['#f97316','Подойдите ближе'],center:['#f97316','Выровняйте центр'],ok:['#4ade80','Позиция ✓']},
+  face:{init:['#555','Поз. лица...'],na:['#888','Поз. — вручную'],
+    none:['#ef4444','Лицо не найдено'],close:['#f97316','Отойдите'],
+    far:['#f97316','Подойдите ближе'],center:['#f97316','Выровняйте'],ok:['#4ade80','Позиция ✓']},
   head:{init:['#555','Голова...'],na:['#888','Голова — вручную'],
     tilt_l:['#f97316','Наклон влево'],tilt_r:['#f97316','Наклон вправо'],
-    turn_l:['#f97316','Повернитесь вправо'],turn_r:['#f97316','Повернитесь влево'],
-    up:['#f97316','Опустите подбородок'],down:['#f97316','Поднимите подбородок'],ok:['#4ade80','Голова ✓']},
-  light:{init:['#555','Свет...'],dark:['#ef4444','Слишком темно'],
-    bright:['#f97316','Слишком ярко'],uneven:['#f97316','Неравный свет'],ok:['#4ade80','Свет ✓']},
+    turn_l:['#f97316','Вправо'],turn_r:['#f97316','Влево'],
+    up:['#f97316','Подбородок ↓'],down:['#f97316','Подбородок ↑'],ok:['#4ade80','Голова ✓']},
+  light:{init:['#555','Свет...'],dark:['#ef4444','Темно'],
+    bright:['#f97316','Ярко'],uneven:['#f97316','Неравный свет'],ok:['#4ade80','Свет ✓']},
 };
 
-function setPill(id, type, status){
-  const el=document.getElementById(id); if(!el)return;
-  const [dot,text]=(PCFG[type][status]||PCFG[type].init);
+function setPill(id,type,st){
+  const el=document.getElementById(id);if(!el)return;
+  const[dot,text]=(PCFG[type][st]||PCFG[type].init);
   el.style.borderColor=dot==='#4ade80'?'rgba(74,222,128,.22)':'rgba(255,255,255,.07)';
   el.innerHTML=`<div class="sd" style="background:${dot}"></div><span class="st" style="color:${dot}">${text}</span>`;
 }
-
 function isReady(){return gFs==='ok'&&(gHs==='ok'||gHs==='na')&&gLs==='ok';}
-
 function setHint(txt,cls){hintEl.textContent=txt;hintEl.className='hint'+(cls?' '+cls:'');}
-
 function updateStatus(){
-  setPill('sp0','face',gFs); setPill('sp1','head',gHs); setPill('sp2','light',gLs);
+  setPill('sp0','face',gFs);setPill('sp1','head',gHs);setPill('sp2','light',gLs);
   const f=gFs,h=gHs,l=gLs;
   if(f==='init')       setHint('Инициализация...');
   else if(f==='none')  setHint('Встаньте перед камерой','warn');
   else if(f==='close') setHint('Отойдите дальше','warn');
   else if(f==='far')   setHint('Подойдите ближе','warn');
-  else if(f==='center')setHint('Выровняйте лицо по центру','warn');
+  else if(f==='center')setHint('Выровняйте лицо','warn');
   else if(h==='tilt_l')setHint('Наклоните голову вправо','warn');
   else if(h==='tilt_r')setHint('Наклоните голову влево','warn');
   else if(h==='turn_l')setHint('Повернитесь правее','warn');
@@ -404,47 +459,40 @@ function updateStatus(){
   else if(h==='down')  setHint('Поднимите подбородок','warn');
   else if(l==='dark')  setHint('Добавьте освещения','warn');
   else if(l==='bright')setHint('Уменьшите яркость','warn');
-  else if(l==='uneven')setHint('Нужен свет с обеих сторон','warn');
+  else if(l==='uneven')setHint('Нужен свет с двух сторон','warn');
   else if(isReady())   setHint('✓ Готово — нажмите кнопку','ok');
   else                 setHint('Совместите лицо с овалом');
   capBtn.className='cbtn'+(isReady()?' rdy':'');
 }
 
-// ─── Capture ──────────────────────────────────────────────────────────
+// ── Capture ───────────────────────────────────────────
 async function doCapture(){
-  if(!vid.videoWidth) return;
+  if(!vid.videoWidth)return;
   gCaptured=true;
-  cancelAnimationFrame(gRaf); clearTimeout(gTimer);
+  cancelAnimationFrame(gRaf);clearTimeout(gAnalyzeTimer);
 
-  // Flash
-  const fl=document.createElement('div'); fl.className='flash';
-  vfEl.appendChild(fl); setTimeout(()=>fl.remove(),280);
+  const fl=document.createElement('div');fl.className='flash';
+  vfEl.appendChild(fl);setTimeout(()=>fl.remove(),280);
 
-  // Proc overlay
-  const po=document.createElement('div'); po.className='proc';
+  const po=document.createElement('div');po.className='proc';
   po.innerHTML=`<div class="spin"></div><p>ОБРАБОТКА</p><small>${gBgRemove?'удаление фона · ':''}коррекция света</small>`;
   vfEl.appendChild(po);
-  await tick(80);
+  await new Promise(r=>setTimeout(r,80));
 
-  // Crop to document aspect
-  const {aspect}=TYPES[gType];
-  const vw=vid.videoWidth, vh=vid.videoHeight;
+  const{aspect}=TYPES[gType];
+  const vw=vid.videoWidth,vh=vid.videoHeight;
   let cW,cH;
   if(vw/vh>aspect){cH=vh;cW=(vh*aspect)|0;}else{cW=vw;cH=(vw/aspect)|0;}
-  const sx=((vw-cW)/2)|0, sy=((vh-cH)/2)|0;
-  capCv.width=cW; capCv.height=cH;
-
-  // Mirror front cam
+  const sx=((vw-cW)/2)|0,sy=((vh-cH)/2)|0;
+  capCv.width=cW;capCv.height=cH;
   if(gFacing==='user'){
     capCtx.save();capCtx.translate(cW,0);capCtx.scale(-1,1);
-    capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);
-    capCtx.restore();
-  } else {
+    capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);capCtx.restore();
+  }else{
     capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);
   }
 
-  // Post-process
-  try {
+  try{
     if(gBgRemove&&gRemoveBg){
       po.querySelector('small').textContent='удаление фона...';
       const blob=await gRemoveBg(capCv,{model:'small',output:{format:'image/png',quality:.92}});
@@ -452,61 +500,51 @@ async function doCapture(){
       await new Promise((res,rej)=>{
         const img=new Image();
         img.onload=()=>{
-          capCtx.fillStyle='#fff'; capCtx.fillRect(0,0,cW,cH);
-          capCtx.drawImage(img,0,0,cW,cH);
-          URL.revokeObjectURL(url); res();
-        };
-        img.onerror=rej; img.src=url;
+          capCtx.fillStyle='#fff';capCtx.fillRect(0,0,cW,cH);
+          capCtx.drawImage(img,0,0,cW,cH);URL.revokeObjectURL(url);res();
+        };img.onerror=rej;img.src=url;
       });
-    } else {
+    }else{
       bgFloodFill(capCtx,cW,cH);
     }
     normLight(capCtx,cW,cH);
-  } catch(e){ console.warn('post:',e); }
+  }catch(e){console.warn('post:',e);}
 
   const url=capCv.toDataURL('image/jpeg',.95);
   po.remove();
-
-  // Show result
-  vid.style.display='none';
-  ov.style.display='none';
-  hintEl.style.display='none';
+  vid.style.display='none';ov.style.display='none';hintEl.style.display='none';
   vfEl.insertAdjacentHTML('beforeend',
     `<div class="prev-wrap"><img src="${url}"/><div class="prev-badge">✓ Фото готово</div></div>`);
-
   document.getElementById('ctrl').innerHTML=
     `<button class="abtn" onclick="retake()">↩ Переснять</button>
      <button class="abtn p" onclick="dlPhoto('${url}')">↓ Сохранить</button>`;
   document.getElementById('sbar').style.opacity='.35';
 }
 
-// ─── BG flood-fill ────────────────────────────────────────────────────
+// ── Post-processing ───────────────────────────────────
 function bgFloodFill(c,w,h){
   const id=c.getImageData(0,0,w,h),d=id.data;
-  let rS=0,gS=0,bS=0,cnt=0;
-  const add=(x,y)=>{const i=(y*w+x)*4;rS+=d[i];gS+=d[i+1];bS+=d[i+2];cnt++;};
+  let rS=0,gS=0,bS=0,n=0;
+  const add=(x,y)=>{const i=(y*w+x)*4;rS+=d[i];gS+=d[i+1];bS+=d[i+2];n++;};
   for(let x=0;x<w;x++){add(x,0);add(x,1);add(x,h-1);add(x,h-2);}
   for(let y=2;y<h-2;y++){add(0,y);add(1,y);add(w-1,y);add(w-2,y);}
-  const bgR=rS/cnt,bgG=gS/cnt,bgB=bS/cnt,thr=65;
+  const bgR=rS/n,bgG=gS/n,bgB=bS/n,thr=65;
   const vis=new Uint8Array(w*h),q=[];
-  function enq(x,y){
+  const enq=(x,y)=>{
     if(x<0||x>=w||y<0||y>=h)return;
     const idx=y*w+x;if(vis[idx])return;vis[idx]=1;
     const i=idx*4,dr=d[i]-bgR,dg=d[i+1]-bgG,db=d[i+2]-bgB;
     if(Math.sqrt(dr*dr+dg*dg+db*db)<thr)q.push(idx);
-  }
+  };
   for(let x=0;x<w;x++){enq(x,0);enq(x,h-1);}
   for(let y=1;y<h-1;y++){enq(0,y);enq(w-1,y);}
   while(q.length){
-    const idx=q.pop();
+    const idx=q.pop(),x=idx%w,y=(idx/w)|0;
     d[idx*4]=255;d[idx*4+1]=255;d[idx*4+2]=255;
-    const x=idx%w,y=(idx/w)|0;
     enq(x+1,y);enq(x-1,y);enq(x,y+1);enq(x,y-1);
   }
   c.putImageData(id,0,0);
 }
-
-// ─── Light normalisation ──────────────────────────────────────────────
 function normLight(c,w,h){
   const id=c.getImageData(0,0,w,h),d=id.data;
   const fx=w*.18|0,fy=h*.05|0,fw=w*.64|0,fh=h*.78|0;
@@ -518,8 +556,7 @@ function normLight(c,w,h){
       s+=.299*d[i]+.587*d[i+1]+.114*d[i+2];n++;
     }
   if(!n||!s)return;
-  const m=158/(s/n);
-  if(Math.abs(m-1)<.06)return;
+  const m=158/(s/n);if(Math.abs(m-1)<.06)return;
   const cl=v=>Math.max(0,Math.min(255,v|0));
   for(let y=fy;y<Math.min(fy+fh,h);y++)
     for(let x=fx;x<Math.min(fx+fw,w);x++){
@@ -530,35 +567,35 @@ function normLight(c,w,h){
   c.putImageData(id,0,0);
 }
 
-// ─── Controls ─────────────────────────────────────────────────────────
+// ── Controls ──────────────────────────────────────────
 function setType(k){
   gType=k;
-  document.querySelectorAll('.pill').forEach((b,i)=>{b.className='pill'+(Object.keys(TYPES)[i]===k?' on':'');});
+  document.querySelectorAll('.pill').forEach((b,i)=>{
+    b.className='pill'+(Object.keys(TYPES)[i]===k?' on':'');
+  });
   const t=TYPES[k];
   document.getElementById('subdesc').textContent=`${t.size} · ${t.desc}`;
   renderReqs();
 }
-
 function flipCam(){gFacing=gFacing==='user'?'environment':'user';retake();}
-
 function toggleBg(){
   gBgRemove=!gBgRemove;
   document.getElementById('bgBtn').className='icobtn'+(gBgRemove?' on':'');
   if(gBgRemove&&!gBgLoaded){
     import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/index.mjs')
       .then(m=>{gRemoveBg=m.removeBackground;gBgLoaded=true;})
-      .catch(e=>{console.warn('bg lib:',e);gBgRemove=false;
-        document.getElementById('bgBtn').className='icobtn';});
+      .catch(()=>{gBgRemove=false;document.getElementById('bgBtn').className='icobtn';});
   }
 }
-
 function retake(){
   gCaptured=false;
-  vid.style.display=''; ov.style.display=''; hintEl.style.display='';
-  document.querySelector('.prev-wrap')?.remove();
+  vid.style.display='';ov.style.display='';hintEl.style.display='';
+  vfEl.querySelector('.prev-wrap')?.remove();
+  vfEl.querySelectorAll('.cam-err').forEach(e=>e.remove());
   document.getElementById('ctrl').innerHTML=`
     <button class="icobtn" onclick="flipCam()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M20 7h-9"/><path d="M14 17H5"/>
         <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
       </svg>
@@ -568,23 +605,14 @@ function retake(){
   document.getElementById('sbar').style.opacity='1';
   startCamera();
 }
-
 function dlPhoto(url){
   const a=document.createElement('a');a.href=url;a.download=`doc_photo_${Date.now()}.jpg`;a.click();
 }
-
 function renderReqs(){
   const t=TYPES[gType];
-  document.getElementById('rg').innerHTML=REQS.map(([k,v])=>
-    `<div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>`
-  ).join('');
+  document.getElementById('rg').innerHTML=
+    REQS.map(([k,v])=>`<div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>`).join('');
 }
-
-function showErr(msg){
-  vfEl.insertAdjacentHTML('beforeend',`<div class="cam-err">${msg.replace(/\n/g,'<br>')}</div>`);
-}
-
-function tick(ms){return new Promise(r=>setTimeout(r,ms));}
 </script>
 </body>
 </html>
