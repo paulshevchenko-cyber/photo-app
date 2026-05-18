@@ -489,6 +489,7 @@ class GeminiDirectBackend {
       throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`);
     }
     const j = await r.json();
+    try { Log.info('compose raw response:', JSON.stringify(j).slice(0, 2000)); } catch(_) {}
     const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
     if (!out) throw new Error(this._explainNoImage(j, 'compose'));
     return 'data:' + out.mime_type + ';base64,' + out.data;
@@ -512,24 +513,34 @@ class GeminiDirectBackend {
       'c) Clothing color, pattern and material — only the cut at the shoulders may be adjusted to make them level. ' +
       'd) Apparent age of the person. ' +
       'Output: same aspect ratio as input, photographic realism, no cartoon/painting style.';
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(this.key)}`;
-    const r = await fetch(url, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contents:[{ parts:[
-          { text: prompt },
-          { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
-        ]}],
-        safetySettings: this._safetySettings(),
-        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
-      })
-    });
+    // Specialised image-generation model; native image output.
+    // Try preview name first (older, often more permissive), fall back to prod name if 404.
+    const candidateModels = ['gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image'];
+    let r;
+    for (let i = 0; i < candidateModels.length; i++) {
+      const model = candidateModels[i];
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(this.key)}`;
+      Log.info(`replaceBg attempt ${i+1}/${candidateModels.length}, model=${model}`);
+      r = await fetch(url, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          contents:[{ parts:[
+            { text: prompt },
+            { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
+          ]}],
+          safetySettings: this._safetySettings()
+        })
+      });
+      if (r.status === 404) { Log.warn(`model ${model} not found, trying next`); continue; }
+      break;
+    }
     if (r.status === 429) {
       throw new Error('Лимит Gemini исчерпан. Бесплатный тариф даёт ~10 генераций изображений в день. ' +
         'Подождите минуту или подключите биллинг: ai.google.dev → API key → Enable billing.');
     }
     if (!r.ok) { const t = await r.text(); throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`); }
     const j = await r.json();
+    try { Log.info('replaceBg raw response:', JSON.stringify(j).slice(0, 2000)); } catch(_) {}
     const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
     if (!out) throw new Error(this._explainNoImage(j, 'replaceBg'));
     return 'data:' + out.mime_type + ';base64,' + out.data;
