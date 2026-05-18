@@ -285,6 +285,7 @@
       <div class="item"><span class="lbl">Цель</span> <span class="v blue" id="goal">30</span></div>
       <div class="item"><span class="lbl">👥</span> <span class="v" id="delivered">0</span></div>
     </div>
+    <button class="icon-btn" id="tilt-btn" title="Управление наклоном">📱</button>
     <button class="icon-btn" id="nav-btn" title="Навигатор">🔊</button>
   </div>
 
@@ -1695,6 +1696,93 @@
     b.classList.toggle('active', navOn);
   })();
 
+  // ===================== TILT CONTROLS =====================
+  // Phone tilt as an alternative to the D-pad: lean right/left = turn,
+  // lean back = brake, lean forward = release brake / wake. Baseline is
+  // captured on first orientation event after enabling, so kids can hold
+  // the phone at their natural angle.
+  let tiltOn = false;
+  let tiltBase = null;
+  let tiltSide = null;     // hysteresis for last-fired turn ('L'|'R'|null)
+  let tiltBraking = false;
+  const TILT_TURN_TH = 18;   // gamma delta to fire a turn
+  const TILT_TURN_REL = 8;   // gamma delta within which we re-arm
+  const TILT_BRAKE_ON = 20;  // beta delta to engage brake
+  const TILT_BRAKE_OFF = 8;  // beta delta to release brake
+
+  function updateTiltBtn() {
+    const b = document.getElementById('tilt-btn');
+    b.classList.toggle('active', tiltOn);
+  }
+
+  function onTilt(e) {
+    if (!tiltOn || !running || paused) return;
+    if (e.beta == null || e.gamma == null) return;
+    if (!tiltBase) { tiltBase = { beta: e.beta, gamma: e.gamma }; return; }
+    const dB = e.beta - tiltBase.beta;
+    const dG = e.gamma - tiltBase.gamma;
+    // Brake / wake — hysteresis so we don't fight the brake button frame by frame.
+    if (!tiltBraking && dB > TILT_BRAKE_ON) { tiltBraking = true; setBrake(true); }
+    else if (tiltBraking && dB < TILT_BRAKE_OFF) { tiltBraking = false; setBrake(false); }
+    if (dB < -TILT_BRAKE_OFF && (!player.dir || player.speed < 0.2)) goForward();
+    // Turn — fire once per threshold crossing.
+    if (dG > TILT_TURN_TH && tiltSide !== 'R') { turnRel('R'); tiltSide = 'R'; }
+    else if (dG < -TILT_TURN_TH && tiltSide !== 'L') { turnRel('L'); tiltSide = 'L'; }
+    else if (Math.abs(dG) < TILT_TURN_REL) { tiltSide = null; }
+  }
+
+  async function toggleTilt() {
+    if (tiltOn) {
+      tiltOn = false;
+      window.removeEventListener('deviceorientation', onTilt);
+      if (tiltBraking) { tiltBraking = false; setBrake(false); }
+      tiltSide = null;
+      tiltBase = null;
+      try { localStorage.setItem('taxi_tilt_on', 'false'); } catch (e) {}
+      showToast('📱 Наклон выключен', '', 1200);
+      updateTiltBtn();
+      return;
+    }
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      showToast('Этот браузер не умеет ориентацию', 'bad', 1800);
+      return;
+    }
+    // iOS Safari 13+ requires explicit permission, requested in a user gesture.
+    if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const res = await DeviceOrientationEvent.requestPermission();
+        if (res !== 'granted') {
+          showToast('Не разрешено использовать ориентацию', 'bad', 2000);
+          return;
+        }
+      } catch (err) {
+        showToast('Ошибка разрешения наклона', 'bad', 1800);
+        return;
+      }
+    }
+    tiltOn = true;
+    tiltBase = null;
+    tiltSide = null;
+    tiltBraking = false;
+    window.addEventListener('deviceorientation', onTilt);
+    try { localStorage.setItem('taxi_tilt_on', 'true'); } catch (e) {}
+    showToast('📱 Наклон включён — держи ровно для калибровки', '', 2400);
+    updateTiltBtn();
+  }
+
+  document.getElementById('tilt-btn').addEventListener('click', toggleTilt);
+
+  // On Android (no requestPermission), restore the prior tilt state silently.
+  (function initTiltBtn() {
+    const stored = localStorage.getItem('taxi_tilt_on');
+    if (stored === 'true' && typeof DeviceOrientationEvent !== 'undefined'
+        && typeof DeviceOrientationEvent.requestPermission !== 'function') {
+      tiltOn = true;
+      window.addEventListener('deviceorientation', onTilt);
+    }
+    updateTiltBtn();
+  })();
+
   // ===================== MAIN LOOP =====================
   function loop(t) {
     if (!running) return;
@@ -1750,7 +1838,7 @@
       '▲ — поехали (после остановки)<br>' +
       '▼ — тормоз (зажать, чтобы стоять)<br>' +
       '◀ ▶ — поворот налево / направо на ближайшем перекрёстке<br>' +
-      '⏸ — пауза &nbsp; 🔊 — навигатор<br><br>' +
+      '⏸ — пауза &nbsp; 🔊 — навигатор &nbsp; 📱 — наклон<br><br>' +
       'Знаки 🛑🔻🔄🚶 объясняются, когда увидишь их в первый раз.<br>' +
       '<b>Цель:</b> набрать <span style="color:#f39c12">' + goal + ' ⭐</span><br>' +
       'Соблюдай правила — за это даются звёздочки!',
