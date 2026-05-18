@@ -443,6 +443,35 @@ class GeminiDirectBackend {
     return 'data:' + out.mime_type + ';base64,' + out.data;
   }
 
+  async replaceBg(dataUrl) {
+    if (!this.configured) throw new Error('Не задан API-ключ Gemini');
+    const prompt =
+      'Edit this photo for use as a Russian ID document (35×45 mm passport photo). ' +
+      'TASKS: ' +
+      '1) Replace the background ENTIRELY with a uniform plain white (#FFFFFF) or very light gray (#F0F0F0). ' +
+      '   Remove every trace of the original surroundings — walls, car interior, seat belts, furniture, other people, shadows on the background. ' +
+      '2) Even out the lighting on the face: remove harsh shadows under the chin, eyes, and nose. Lighting should be soft and frontal. ' +
+      'STRICT — DO NOT CHANGE: ' +
+      'a) The person\'s face — keep eye spacing, nose length, chin shape, head proportions and skin tone EXACTLY as in the input (within 5%). ' +
+      'b) Hair (color, style, length, fly-aways). Beard, eyebrows, moles, freckles, glasses. ' +
+      'c) Clothing color and cut at the visible shoulders/neck. ' +
+      'd) Apparent age of the person. ' +
+      'Output: same aspect ratio as input, photographic realism, no cartoon/painting style.';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(this.key)}`;
+    const r = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents:[{ parts:[
+        { text: prompt },
+        { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
+      ]}]})
+    });
+    if (!r.ok) { const t = await r.text(); throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`); }
+    const j = await r.json();
+    const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
+    if (!out) throw new Error('AI не вернул изображение. Возможно, фильтр безопасности отклонил запрос.');
+    return 'data:' + out.mime_type + ';base64,' + out.data;
+  }
+
   async estimateAge(dataUrl) {
     if (!this.configured) throw new Error('Не задан API-ключ Gemini');
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(this.key)}`;
@@ -468,6 +497,9 @@ class TelegramProxyBackend {
   constructor(opts) { this.botUrl = opts?.botUrl || ''; this.token = opts?.token || ''; }
   get configured() { return !!this.botUrl; }
   async compose() {
+    throw new Error('Telegram-бэкенд ещё не настроен на сервере. Используйте прямой Gemini.');
+  }
+  async replaceBg() {
     throw new Error('Telegram-бэкенд ещё не настроен на сервере. Используйте прямой Gemini.');
   }
   async estimateAge() { return null; }
@@ -928,9 +960,11 @@ async function doCapture() {
   }
 
   po.step('Постобработка');
-  po.substep('масштабируем до 300 DPI, фон, свет');
+  po.substep('масштабируем до 300 DPI, мягкая коррекция света');
   po.progress(0.5);
-  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: gPortrait });
+  // Flood-fill отключён по умолчанию — даёт артефакты на сложном фоне (машина, комната).
+  // Для удаления фона пользователь нажимает «🪄 AI фон» в preview (Gemini) или 🪄 ImgLy.
+  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
   po.progress(1);
   po.remove();
   Backup.saveFinal(url, { kind:'single-camera', type: gType });
@@ -1001,7 +1035,7 @@ async function finalizeCapturedCanvas(srcCv, opts = {}) {
     } else if (!opts.skipBgFill) {
       bgFloodFill(outCtx, tw, th);
     }
-    normLight(outCtx, tw, th);
+    if (!opts.skipLight) normLight(outCtx, tw, th);
   } catch (e) { console.warn('post-process:', e); }
 
   const raw = outCv.toDataURL('image/jpeg', .95);
@@ -1043,13 +1077,28 @@ function normLight(c, w, h) {
       s += .299*d[i] + .587*d[i+1] + .114*d[i+2]; n++;
     }
   if (!n || !s) return;
-  const m = 158/(s/n); if (Math.abs(m-1) < .06) return;
+  const avg = s/n;
+  // Если средняя яркость лица уже в нормальном диапазоне — ничего не трогаем
+  if (avg >= 115 && avg <= 180) return;
+  // Мягкий target и клип коэффициента, чтобы не пересвечивать
+  const targetAvg = 140;
+  let m = targetAvg / avg;
+  m = Math.max(0.75, Math.min(1.25, m));
+  if (Math.abs(m - 1) < .04) return;
+  // Гамма-подобная мягкая кривая: яркие пиксели почти не меняются, тени поднимаются
   const cl = v => Math.max(0, Math.min(255, v|0));
+  const adjust = v => {
+    const t = v / 255;
+    const soft = m > 1
+      ? 1 - Math.pow(1 - t, 1/m)        // поднять тени, не трогать highlights
+      : Math.pow(t, 1/m);                // приглушить highlights
+    return cl(soft * 255);
+  };
   for (let y=fy; y<Math.min(fy+fh,h); y++)
     for (let x=fx; x<Math.min(fx+fw,w); x++) {
       const i=(y*w+x)*4;
       if (d[i]>250 && d[i+1]>250 && d[i+2]>250) continue;
-      d[i]=cl(d[i]*m); d[i+1]=cl(d[i+1]*m); d[i+2]=cl(d[i+2]*m);
+      d[i]=adjust(d[i]); d[i+1]=adjust(d[i+1]); d[i+2]=adjust(d[i+2]);
     }
   c.putImageData(id, 0, 0);
 }
@@ -1096,25 +1145,153 @@ function u8ToDataUrl(u8) {
 function showPreview(url, opts) {
   vid.style.display='none'; ov.style.display='none'; hintEl.style.display='none';
   vfEl.querySelectorAll('.prev-wrap,.bstrip').forEach(e => e.remove());
-  const badge = opts.kind === 'ai-ok'  ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
-              : opts.kind === 'ai-fb'  ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
+  const badge = opts.kind === 'ai-ok'   ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
+              : opts.kind === 'ai-fb'   ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
+              : opts.kind === 'ai-bg'   ? '<div class="prev-badge">✓ AI фон заменён</div>'
               : '<div class="prev-badge">✓ Фото готово</div>';
   vfEl.insertAdjacentHTML('beforeend',
     `<div class="prev-wrap"><img src="${url}"/>${badge}</div>`);
   ctrlEl.innerHTML = `
     <button class="abtn" onclick="retake()">↩ Переснять</button>
+    <button class="abtn" onclick="aiCleanBg()" title="Заменить фон через Gemini">🪄 AI фон</button>
     <div class="paper-toggle">
       <button class="${gPaper==='10x15'?'on':''}" onclick="setPaper('10x15')">10×15</button>
       <button class="${gPaper==='a4'?'on':''}"    onclick="setPaper('a4')">A4</button>
     </div>
-    <button class="abtn"   onclick="printSheet('${url}')">⎙ Лист</button>
-    <button class="abtn p" onclick="dlPhoto('${url}')">↓ JPEG</button>`;
+    <button class="abtn"   onclick="printSheet('${gLastPhotoUrl}')">⎙ Лист</button>
+    <button class="abtn p" onclick="dlPhoto('${gLastPhotoUrl}')">↓ JPEG</button>`;
   document.getElementById('sbar').style.opacity = '.35';
   gLastPhotoUrl = url;
+  if (opts.kind === 'single' || opts.kind === 'ai-bg') gLastSourceUrl = gLastSourceUrl || url;
+  if (opts.kind === 'single') gLastSourceUrl = url;  // обновляем источник при новой съёмке
 }
 let gLastPhotoUrl = null;
+let gLastSourceUrl = null;  // фото ДО AI фона — для повторной попытки и сравнения
 
 function setPaper(p) { gPaper = p; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
+
+/* ═══════════════════════════════════════════════════════
+   AI background replacement (Gemini) with two-stage verify:
+   1) same person — facial metrics (iod, e2c, n2m) within ±5%
+   2) background actually white — sample edge strips
+   On any failure → keep original, explain why.
+═══════════════════════════════════════════════════════ */
+
+async function aiCleanBg() {
+  const ai = makeAiBackend();
+  if (!ai.configured) { toast('Введите API-ключ Gemini в ⚙ настройках', 'warn'); openSettings(); return; }
+  const source = gLastSourceUrl || gLastPhotoUrl;
+  if (!source) { toast('Нет исходного фото', 'err'); return; }
+
+  const po = showProcessing('замена фона через Gemini');
+  po.step('1/4: измеряем исходные пропорции');
+  po.progress(0.1);
+  const refMetrics = await measureFaceMetrics(source);
+  if (!refMetrics) {
+    po.remove();
+    toast('Не нашёл лицо на исходном фото — нельзя проверить искажения', 'warn');
+    return;
+  }
+  Log.info('aiCleanBg ref:', refMetrics);
+
+  po.step('2/4: Gemini заменяет фон');
+  po.substep('ожидаем результат… до 30 сек');
+  po.progress(0.3);
+  let aiUrl;
+  try {
+    const t0 = Date.now();
+    aiUrl = await ai.replaceBg(source);
+    Log.info('replaceBg done in', ((Date.now()-t0)/1000).toFixed(1), 's');
+  } catch (e) {
+    po.remove(); Log.error('replaceBg failed:', e);
+    toast('Gemini: ' + (e.message||e), 'err');
+    return;
+  }
+  po.progress(0.55);
+
+  po.step('3/4: тот же ли человек?');
+  po.substep('MediaPipe сверяет геометрию лица');
+  po.progress(0.65);
+  const aiMetrics = await measureFaceMetrics(aiUrl);
+  let okPerson = true, badPerson = '';
+  if (!aiMetrics) { okPerson = false; badPerson = 'на результате не найдено лицо'; }
+  else {
+    const dev = k => Math.abs(aiMetrics[k] - refMetrics[k]) / Math.max(Math.abs(refMetrics[k]), 1e-6);
+    for (const k of ['iod','e2c','n2m']) {
+      const d = dev(k);
+      Log.info(`bg-check ${k}: ref=${refMetrics[k].toFixed(3)} ai=${aiMetrics[k].toFixed(3)} dev=${(d*100).toFixed(1)}%`);
+      po.substep(`${k}: отклонение ${(d*100).toFixed(1)}% (макс 5%)`);
+      if (d > 0.05) { okPerson = false; badPerson = `${k} отклонилось на ${(d*100).toFixed(1)}% (макс 5%)`; break; }
+    }
+  }
+  po.progress(0.8);
+
+  po.step('4/4: белый ли фон?');
+  po.substep('сэмплируем края изображения');
+  po.progress(0.9);
+  const bgCheck = await checkBackgroundWhite(aiUrl);
+  Log.info('bg-white check:', bgCheck);
+  po.substep(bgCheck.ok ? `фон ок: средняя яркость ${bgCheck.meanL.toFixed(0)}/255` : `фон НЕ белый: ${bgCheck.reason}`);
+  po.progress(1);
+  po.remove();
+
+  if (!okPerson) {
+    toast(`AI исказил лицо: ${badPerson}. Оставляем оригинал.`, 'warn');
+    Log.warn('aiCleanBg rejected — person check:', badPerson);
+    return;
+  }
+  if (!bgCheck.ok) {
+    toast(`AI не убрал фон: ${bgCheck.reason}. Оставляем оригинал.`, 'warn');
+    Log.warn('aiCleanBg rejected — bg check:', bgCheck.reason);
+    return;
+  }
+
+  // Прогоняем через тот же конвейер: ресемпл на 300 DPI + JFIF DPI.
+  // Никакой нашей пост-обработки света (AI уже отбалансировал).
+  const img = await loadImage(aiUrl);
+  const t = TYPES[gType];
+  const sw = img.width, sh = img.height;
+  let cW, cH;
+  if (sw/sh > t.aspect) { cH = sh; cW = (sh*t.aspect)|0; }
+  else                  { cW = sw; cH = (sw/t.aspect)|0; }
+  const sx = ((sw-cW)/2)|0, sy = ((sh-cH)/2)|0;
+  capCv.width = cW; capCv.height = cH;
+  capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+  const finalUrl = await finalizeCapturedCanvas(capCv, { skipBgFill: true, skipLight: true });
+  Backup.saveFinal(finalUrl, { kind:'ai-bg', type: gType });
+  toast(`AI фон: OK. Лицо ±${Math.max(...['iod','e2c','n2m'].map(k => Math.abs(aiMetrics[k]-refMetrics[k])/refMetrics[k]*100)).toFixed(1)}%, фон ${bgCheck.meanL.toFixed(0)}/255`, 'ok');
+  showPreview(finalUrl, { kind:'ai-bg' });
+}
+
+/* Проверка: реально ли фон стал белым.
+   Сэмплируем верх/низ/лево/право по 6% от размера,
+   считаем среднюю яркость и стандартное отклонение. */
+async function checkBackgroundWhite(dataUrl) {
+  const img = await loadImage(dataUrl);
+  const cv = document.createElement('canvas');
+  cv.width = img.width; cv.height = img.height;
+  const cx = cv.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const w = cv.width, h = cv.height;
+  const stripW = Math.max(2, w*0.06|0), stripH = Math.max(2, h*0.06|0);
+  const samples = [];
+  const eat = (x0,y0,sw,sh) => {
+    const d = cx.getImageData(x0,y0,sw,sh).data;
+    for (let i=0; i<d.length; i+=4) {
+      samples.push(.299*d[i] + .587*d[i+1] + .114*d[i+2]);
+    }
+  };
+  eat(0,0,w,stripH);             // top
+  eat(0,h-stripH,w,stripH);      // bottom
+  eat(0,stripH,stripW,h-2*stripH); // left
+  eat(w-stripW,stripH,stripW,h-2*stripH); // right
+  const meanL = samples.reduce((a,b)=>a+b,0) / samples.length;
+  const varL = samples.reduce((a,b)=>a + (b-meanL)*(b-meanL), 0) / samples.length;
+  const stdL = Math.sqrt(varL);
+  if (meanL < 215) return { ok:false, meanL, stdL, reason:`средняя яркость краёв ${meanL.toFixed(0)}/255 (нужно ≥ 215)` };
+  if (stdL > 25)   return { ok:false, meanL, stdL, reason:`фон неоднородный (σ=${stdL.toFixed(0)}, нужно ≤ 25)` };
+  return { ok:true, meanL, stdL };
+}
 
 /* ═══════════════════════════════════════════════════════
    Print sheet
@@ -1419,7 +1596,7 @@ async function useShot(idx) {
     capCv.width = cW; capCv.height = cH;
     capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
     po.substep('пост-обработка'); po.progress(0.6);
-    const url = await finalizeCapturedCanvas(capCv, { skipBgFill: false });
+    const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
     po.progress(1);
     po.remove();
     Backup.saveFinal(url, { kind:'manual-pick', type: gType, idx });
@@ -1544,7 +1721,7 @@ async function composeAi() {
   const sx = ((img.width-cW)/2)|0, sy = ((img.height-cH)/2)|0;
   capCv.width = cW; capCv.height = cH;
   capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
-  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: false });
+  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
   Backup.saveFinal(url, { kind:'ai-fallback', reason: badReason, type: gType });
   showPreview(url, { kind:'ai-fb' });
 }
