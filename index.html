@@ -13,226 +13,581 @@ html,body{height:100%;background:#0E0E12;overflow:hidden}
 body{font-family:'Courier New',monospace;-webkit-tap-highlight-color:transparent;color:#E8D5A3}
 button{cursor:pointer;font-family:inherit;background:none;border:none;outline:none;-webkit-appearance:none}
 button:active{transform:scale(.95);opacity:.8}
+input,select,textarea{font-family:inherit}
 
 .app{height:100dvh;display:flex;flex-direction:column;max-width:480px;margin:0 auto}
 
+/* Ad slots — reserved space, hidden by default. Activate via ?ads=1 or localStorage.ads='1'. */
+.ad-slot{flex-shrink:0;min-height:50px;background:repeating-linear-gradient(45deg,rgba(232,213,163,.04),rgba(232,213,163,.04) 8px,transparent 8px,transparent 16px);
+         display:none;align-items:center;justify-content:center;font-size:9px;color:rgba(232,213,163,.3);letter-spacing:.1em}
+.ad-slot.show{display:flex}
+
 /* Header */
 .hdr{flex-shrink:0;padding:9px 14px 7px;border-bottom:1px solid rgba(232,213,163,.1);background:#000}
-.hdr-title{font-size:10px;letter-spacing:.16em;color:#F5C842;font-weight:700;margin-bottom:7px}
-.pills{display:flex;gap:5px}
+.hdr-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:7px}
+.hdr-title{font-size:10px;letter-spacing:.16em;color:#F5C842;font-weight:700}
+.hdr-cog{font-size:14px;color:rgba(232,213,163,.6);padding:2px 6px;border-radius:3px}
+.hdr-cog:hover{color:#F5C842}
+.pills{display:flex;gap:5px;flex-wrap:wrap}
 .pill{border:1px solid rgba(232,213,163,.2);border-radius:3px;color:rgba(232,213,163,.45);
       font-size:10px;padding:4px 10px;letter-spacing:.04em;transition:all .15s}
 .pill.on{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
 .subdesc{font-size:9px;color:rgba(232,213,163,.32);margin-top:4px;letter-spacing:.06em}
 
+/* Child sub-tabs */
+.child-tabs{display:none;gap:6px;padding:6px 14px;background:rgba(0,0,0,.6);border-bottom:1px solid rgba(232,213,163,.08)}
+.child-tabs.show{display:flex}
+.ctab{flex:1;border:1px solid rgba(232,213,163,.2);border-radius:3px;color:rgba(232,213,163,.55);
+      font-size:10px;padding:6px;letter-spacing:.04em}
+.ctab.on{background:rgba(96,165,250,.12);border-color:#60a5fa;color:#60a5fa}
+
 /* Viewfinder */
 .vf{flex:1;position:relative;background:#111;overflow:hidden;min-height:0}
-
-/* Video fills the viewfinder */
-#vid{
-  position:absolute;top:0;left:0;
-  width:100%;height:100%;
-  object-fit:cover;
-  display:block;
-  background:#111;
-}
+#vid{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block;background:#111}
 .mirror{transform:scaleX(-1)}
-
-/* Overlay canvas — transparent, pointer-events:none */
 #ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 
-/* Hint */
-#hint{
-  position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
-  background:rgba(0,0,0,.82);font-size:10px;padding:6px 16px;border-radius:20px;
-  pointer-events:none;white-space:nowrap;letter-spacing:.05em;
-  border:1px solid rgba(232,213,163,.14);color:rgba(232,213,163,.85);
-  max-width:92%;text-align:center;z-index:3;
-}
-#hint.ok  {color:#4ade80;border-color:rgba(74,222,128,.4)}
+#hint{position:absolute;bottom:10px;left:50%;transform:translateX(-50%);
+      background:rgba(0,0,0,.82);font-size:10px;padding:6px 16px;border-radius:20px;
+      pointer-events:none;white-space:nowrap;letter-spacing:.05em;
+      border:1px solid rgba(232,213,163,.14);color:rgba(232,213,163,.85);
+      max-width:92%;text-align:center;z-index:3}
+#hint.ok{color:#4ade80;border-color:rgba(74,222,128,.4)}
 #hint.warn{color:#fb923c;border-color:rgba(251,146,60,.35)}
 
-/* Flash */
-.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:9;
-       animation:fl .2s forwards}
+.flash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:9;animation:fl .2s forwards}
 @keyframes fl{to{opacity:0}}
 
-/* Processing */
 .proc{position:absolute;inset:0;background:rgba(0,0,0,.92);z-index:20;
-      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
-.spin{width:36px;height:36px;border:3px solid rgba(245,200,66,.15);
-      border-top-color:#F5C842;border-radius:50%;animation:sp .7s linear infinite}
+      display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;text-align:center}
+.spin{width:36px;height:36px;border:3px solid rgba(245,200,66,.15);border-top-color:#F5C842;border-radius:50%;animation:sp .7s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
 .proc p{color:#E8D5A3;font-size:11px;letter-spacing:.12em}
-.proc small{font-size:9px;color:rgba(232,213,163,.4)}
+.proc small{font-size:9px;color:rgba(232,213,163,.4);max-width:280px;line-height:1.5}
 
-/* Preview */
-.prev-wrap{position:absolute;inset:0;z-index:15;display:flex;align-items:center;
-           justify-content:center;background:#111}
+.prev-wrap{position:absolute;inset:0;z-index:15;display:flex;align-items:center;justify-content:center;background:#111}
 .prev-wrap img{max-width:100%;max-height:100%;object-fit:contain}
-.prev-badge{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.8);
-            border:1px solid #4ade80;border-radius:4px;padding:4px 10px;
-            font-size:10px;color:#fff}
+.prev-badge{position:absolute;top:10px;right:10px;background:rgba(0,0,0,.8);border:1px solid #4ade80;border-radius:4px;padding:4px 10px;font-size:10px;color:#fff}
+.prev-badge.warn{border-color:#fb923c;color:#fb923c}
 
-/* Error */
-.cam-err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
-         justify-content:center;gap:14px;padding:28px;background:rgba(0,0,0,.92);
-         font-size:12px;text-align:center;line-height:1.7;z-index:10;
-         color:rgba(232,213,163,.9)}
+.cam-err{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px;
+         background:rgba(0,0,0,.92);font-size:12px;text-align:center;line-height:1.7;z-index:10;color:rgba(232,213,163,.9)}
 .cam-err b{font-size:32px}
+.cam-err button{margin-top:8px;padding:10px 24px;background:rgba(245,200,66,.15);border:1px solid #F5C842;border-radius:4px;color:#F5C842;font-size:11px;letter-spacing:.1em}
+
+.tap-start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:rgba(0,0,0,.85);z-index:8;cursor:pointer}
+.tap-start b{font-size:48px;color:#F5C842}
+.tap-start p{color:#E8D5A3;font-size:12px;letter-spacing:.1em}
 
 /* Status bar */
-#sbar{flex-shrink:0;display:flex;gap:4px;padding:5px 8px;
-      background:rgba(0,0,0,.5);border-top:1px solid rgba(232,213,163,.08)}
-.sp{flex:1;min-width:0;display:flex;align-items:center;gap:4px;
-    padding:4px 6px;border-radius:3px;background:rgba(255,255,255,.04);
+#sbar{flex-shrink:0;display:flex;gap:4px;padding:5px 8px;background:rgba(0,0,0,.5);border-top:1px solid rgba(232,213,163,.08)}
+.sp{flex:1;min-width:0;display:flex;align-items:center;gap:4px;padding:4px 6px;border-radius:3px;background:rgba(255,255,255,.04);
     border:1px solid rgba(255,255,255,.07);font-size:8.5px;letter-spacing:.04em}
 .sd{width:6px;height:6px;min-width:6px;border-radius:50%}
 .st{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 /* Controls */
-#ctrl{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;
-      padding:12px 24px;background:#0E0E12;
-      border-top:1px solid rgba(232,213,163,.08);gap:10px}
-.cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;
-      background:transparent;display:flex;align-items:center;justify-content:center;
-      flex-shrink:0;box-shadow:0 0 14px rgba(245,200,66,.14);
-      transition:border-color .25s,box-shadow .25s}
+#ctrl{flex-shrink:0;display:flex;align-items:center;justify-content:space-around;padding:12px 16px;background:#0E0E12;
+      border-top:1px solid rgba(232,213,163,.08);gap:10px;flex-wrap:wrap}
+.cbtn{width:64px;height:64px;border-radius:50%;border:3px solid #F5C842;background:transparent;
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 14px rgba(245,200,66,.14);
+      transition:border-color .25s,box-shadow .25s;position:relative}
 .cbtn.rdy{border-color:#4ade80;animation:rp 1.6s ease-in-out infinite}
 @keyframes rp{0%,100%{box-shadow:0 0 14px rgba(74,222,128,.2)}50%{box-shadow:0 0 30px rgba(74,222,128,.6)}}
-.ci{width:48px;height:48px;border-radius:50%;background:#F5C842;
-    transition:background .25s;pointer-events:none}
+.cbtn.child{border-color:#60a5fa}
+.ci{width:48px;height:48px;border-radius:50%;background:#F5C842;transition:background .25s;pointer-events:none}
 .cbtn.rdy .ci{background:#4ade80}
-.icobtn{width:42px;height:42px;border-radius:50%;background:rgba(232,213,163,.05);
-        border:1px solid rgba(232,213,163,.2);color:#E8D5A3;
-        display:flex;align-items:center;justify-content:center;
-        flex-shrink:0;font-size:18px}
+.cbtn.child .ci{background:#60a5fa}
+.cbtn .cn{position:absolute;font-size:10px;color:#0E0E12;font-weight:700;pointer-events:none}
+.icobtn{width:42px;height:42px;border-radius:50%;background:rgba(232,213,163,.05);border:1px solid rgba(232,213,163,.2);
+        color:#E8D5A3;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px}
 .icobtn.on{border-color:#60a5fa;background:rgba(96,165,250,.1)}
-.abtn{flex:1;padding:11px 0;background:transparent;
-      border:1px solid rgba(232,213,163,.25);color:#E8D5A3;
-      border-radius:4px;font-size:11px;letter-spacing:.1em}
+.icobtn:disabled{opacity:.3;cursor:not-allowed}
+.abtn{flex:1 1 30%;min-width:90px;padding:11px 0;background:transparent;border:1px solid rgba(232,213,163,.25);
+      color:#E8D5A3;border-radius:4px;font-size:11px;letter-spacing:.08em;text-align:center}
 .abtn.p{background:rgba(245,200,66,.12);border-color:#F5C842;color:#F5C842}
+.paper-toggle{display:flex;gap:0;border:1px solid rgba(232,213,163,.2);border-radius:3px;overflow:hidden;align-self:center}
+.paper-toggle button{padding:6px 8px;font-size:9px;color:rgba(232,213,163,.6);background:transparent}
+.paper-toggle button.on{background:rgba(245,200,66,.18);color:#F5C842}
 
-/* Req */
-#req{flex-shrink:0;padding:7px 14px 10px;
-     border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.25)}
+/* Requirements */
+#req{flex-shrink:0;padding:7px 14px 10px;border-top:1px solid rgba(232,213,163,.07);background:rgba(0,0,0,.25)}
 #req h4{font-size:8px;letter-spacing:.2em;color:rgba(232,213,163,.28);margin-bottom:5px}
 .rg{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px}
-.ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;
-    border-bottom:1px solid rgba(232,213,163,.06)}
+.ri{display:flex;justify-content:space-between;font-size:9px;padding:2px 0;border-bottom:1px solid rgba(232,213,163,.06)}
 .rk{color:rgba(232,213,163,.35)}.rv{color:rgba(232,213,163,.7);text-align:right}
+
+/* Burst strip */
+.bstrip{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.94);z-index:16;padding:14px;border-top:1px solid rgba(232,213,163,.15);
+        display:flex;flex-direction:column;gap:10px;max-height:70%;overflow-y:auto}
+.bstrip-h{display:flex;justify-content:space-between;align-items:center;font-size:10px;letter-spacing:.1em;color:rgba(232,213,163,.7)}
+.bstrip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.bthumb{aspect-ratio:35/45;border:2px solid rgba(232,213,163,.2);border-radius:3px;overflow:hidden;cursor:pointer;background:#222;position:relative}
+.bthumb.ok{border-color:#4ade80}
+.bthumb.bad{border-color:rgba(239,68,68,.5);opacity:.45}
+.bthumb img{width:100%;height:100%;object-fit:cover}
+.bthumb-x{position:absolute;top:2px;right:2px;font-size:9px;color:#ef4444;background:rgba(0,0,0,.6);padding:1px 3px;border-radius:2px}
+.bstrip-act{display:flex;gap:6px}
+.bstrip-act .abtn{flex:1}
+
+/* Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:30;display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{background:#161620;border:1px solid rgba(232,213,163,.2);border-radius:6px;padding:18px;max-width:380px;width:100%;
+       display:flex;flex-direction:column;gap:12px}
+.modal h3{font-size:12px;letter-spacing:.15em;color:#F5C842}
+.modal label{font-size:10px;color:rgba(232,213,163,.7);display:flex;flex-direction:column;gap:4px}
+.modal input[type=password],.modal input[type=text]{background:#0a0a10;border:1px solid rgba(232,213,163,.25);border-radius:3px;
+       padding:8px 10px;color:#E8D5A3;font-size:11px;letter-spacing:.04em}
+.modal select{background:#0a0a10;border:1px solid rgba(232,213,163,.25);border-radius:3px;padding:8px 10px;color:#E8D5A3;font-size:11px}
+.modal small{font-size:9px;color:rgba(232,213,163,.45);line-height:1.5}
+.modal-row{display:flex;gap:8px}
+.modal-row .abtn{flex:1}
+
+/* Toast */
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:rgba(0,0,0,.92);border:1px solid rgba(232,213,163,.3);
+       border-radius:4px;padding:10px 18px;font-size:11px;color:#E8D5A3;z-index:40;max-width:90%;text-align:center;line-height:1.5;
+       animation:tin .2s ease-out}
+.toast.warn{border-color:#fb923c;color:#fb923c}
+.toast.err{border-color:#ef4444;color:#ef4444}
+.toast.ok{border-color:#4ade80;color:#4ade80}
+@keyframes tin{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+.upload-help{font-size:10px;color:rgba(232,213,163,.55);text-align:center;letter-spacing:.04em;padding:4px 8px}
 </style>
 </head>
 <body>
 <div class="app">
 
+  <div class="ad-slot" id="adTop" data-ad-slot="top"></div>
+
   <div class="hdr">
-    <div class="hdr-title">⊞ ФОТО НА ДОКУМЕНТЫ РФ</div>
+    <div class="hdr-row">
+      <div class="hdr-title">⊞ ФОТО НА ДОКУМЕНТЫ РФ</div>
+      <button class="hdr-cog" onclick="openSettings()" aria-label="Настройки">⚙</button>
+    </div>
     <div class="pills">
       <button class="pill on" onclick="setType('passport')">Паспорт / Загран</button>
       <button class="pill"    onclick="setType('visa')">Виза</button>
-      <button class="pill"    onclick="setType('zagran')">Воен. билет</button>
+      <button class="pill"    onclick="setType('military')">Воен. билет</button>
+      <button class="pill"    onclick="toggleChildMode()" id="childPill">👶 Ребёнок</button>
     </div>
     <div class="subdesc" id="subdesc">35×45 мм · Загранпаспорт, ВНЖ, СНИЛС</div>
+  </div>
+
+  <div class="child-tabs" id="childTabs">
+    <button class="ctab on" onclick="setChildSrc('burst')" id="ctab0">📸 Серия 5×</button>
+    <button class="ctab"    onclick="setChildSrc('upload')" id="ctab1">📁 Загрузить 4–12</button>
   </div>
 
   <div class="vf" id="vf">
     <video id="vid" autoplay playsinline muted></video>
     <canvas id="ov"></canvas>
-    <div id="hint" class="hint">Нажмите для запуска камеры</div>
+    <div id="hint" class="hint">Запуск…</div>
   </div>
+
+  <div class="ad-slot" id="adMid" data-ad-slot="mid"></div>
 
   <div id="sbar">
-    <div class="sp" id="sp0"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Поз. лица...</span></div>
-    <div class="sp" id="sp1"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Голова...</span></div>
-    <div class="sp" id="sp2"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Свет...</span></div>
+    <div class="sp" id="sp0"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Поз. лица…</span></div>
+    <div class="sp" id="sp1"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Голова…</span></div>
+    <div class="sp" id="sp2"><div class="sd" style="background:#555"></div><span class="st" style="color:#555">Свет…</span></div>
   </div>
 
-  <div id="ctrl">
-    <button class="icobtn" onclick="flipCam()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 7h-9"/><path d="M14 17H5"/>
-        <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
-      </svg>
-    </button>
-    <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
-    <button class="icobtn" id="bgBtn" onclick="toggleBg()">🪄</button>
-  </div>
+  <div id="ctrl"></div>
 
   <div id="req">
-    <h4>ТРЕБОВАНИЯ ГОСТ Р 52425-2005</h4>
+    <h4>ТРЕБОВАНИЯ ГОСТ Р 70997-2023</h4>
     <div class="rg" id="rg"></div>
   </div>
 </div>
 
+<input type="file" id="fileSingle" accept="image/*" hidden>
+<input type="file" id="fileMulti"  accept="image/*" multiple hidden>
+
 <script>
 'use strict';
-/* ───────────────────────────────────────────────────────
-   Robust camera start strategy:
-   1. Try getUserMedia with ideal constraints
-   2. Fallback to {video:true} if that fails
-   3. Listen for loadedmetadata + canplay + playing
-   4. Polling fallback: check videoWidth every 200ms
-   5. If nothing after 8s — show helpful error
-─────────────────────────────────────────────────────── */
 
-const TYPES={
-  passport:{label:'Паспорт / Загран',size:'35×45 мм',aspect:35/45,desc:'Загранпаспорт, ВНЖ, СНИЛС'},
-  visa:    {label:'Виза',            size:'35×45 мм',aspect:35/45,desc:'Шенген, US, UK, Китай'},
-  zagran:  {label:'Воен. билет',     size:'30×40 мм',aspect:30/40,desc:'Военный билет, приписное'},
+/* ═══════════════════════════════════════════════════════
+   Constants and configuration
+═══════════════════════════════════════════════════════ */
+
+const TYPES = {
+  passport: { label:'Паспорт / Загран', size:'35×45 мм', aspect:35/45, desc:'Загранпаспорт, ВНЖ, СНИЛС',
+              wMM:35, hMM:45, headPctMin:.70, headPctMax:.80, eyeFromBottomMin:.56, eyeFromBottomMax:.70 },
+  visa:     { label:'Виза',             size:'35×45 мм', aspect:35/45, desc:'Шенген, US, UK, Китай',
+              wMM:35, hMM:45, headPctMin:.70, headPctMax:.80, eyeFromBottomMin:.56, eyeFromBottomMax:.70 },
+  military: { label:'Воен. билет',      size:'30×40 мм', aspect:30/40, desc:'Военный билет, приписное',
+              wMM:30, hMM:40, headPctMin:.70, headPctMax:.80, eyeFromBottomMin:.55, eyeFromBottomMax:.68 },
 };
-const REQS=[['Размер',null],['Лицо','70–80% высоты'],['Фон','белый / светло-серый'],
-            ['Взгляд','прямо в объектив'],['Выражение','нейтральное'],['Качество','без теней, резкое']];
-const FR={ovalCY:.47,ovalH:.74,ovalW:.54,eyeY:.55,chinY:.85,crownY:.11};
 
-// State
-let gType='passport', gFacing='user', gBgRemove=false, gCaptured=false;
+const BURST_COUNT = 5;
+const UPLOAD_MIN = 4, UPLOAD_MAX = 12, UPLOAD_RECOMMENDED = 8;
+const TOLERANCE = { burst: 0.05, upload: 0.08 };  // ±5% / ±8% deviation in face metrics
+const AGE_TOLERANCE_YEARS = 2;
+const TARGET_DPI = 300;
+
+/* ═══════════════════════════════════════════════════════
+   Platform adapter — keep DOM/web specifics isolated so
+   that an Android (Capacitor/WebView) port can swap this
+   layer for native bridges without touching app logic.
+═══════════════════════════════════════════════════════ */
+
+const Platform = {
+  isWeb: true,
+  isAndroid: typeof window !== 'undefined' && !!window.AndroidBridge,  // future native bridge
+  secureContext: () => typeof window !== 'undefined' && window.isSecureContext,
+  storage: {
+    get: (k) => { try { return localStorage.getItem(k); } catch(e) { return null; } },
+    set: (k,v) => { try { localStorage.setItem(k,v); } catch(e) {} },
+  },
+  share: async (blob, name) => {
+    if (navigator.share && navigator.canShare?.({files:[new File([blob], name)]})) {
+      return navigator.share({ files:[new File([blob], name, {type:blob.type})], title:'Фото на документы' });
+    }
+    return false;
+  },
+  // print() opens a new window with HTML and triggers the print dialog;
+  // on Android this would be replaced by Capacitor PrintPlugin / Printing.print()
+  print: (html) => {
+    const blob = new Blob([html], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank');
+    if (!win) {
+      // popup blocked — use overlay iframe fallback
+      const ifr = document.createElement('iframe');
+      ifr.style.cssText='position:fixed;inset:0;width:100vw;height:100vh;border:0;z-index:50;background:#fff';
+      ifr.src = url;
+      document.body.appendChild(ifr);
+      ifr.onload = () => setTimeout(() => {
+        try { ifr.contentWindow.print(); } catch(e) {}
+        setTimeout(() => { ifr.remove(); URL.revokeObjectURL(url); }, 1000);
+      }, 200);
+    } else {
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+  },
+};
+
+/* ═══════════════════════════════════════════════════════
+   Log — ring buffer in localStorage so the user (and we)
+   can diagnose "не работает" cases. Capped at 200 entries.
+═══════════════════════════════════════════════════════ */
+
+const Log = (() => {
+  const KEY = 'log';
+  const MAX = 200;
+  let mem = [];
+  try { mem = JSON.parse(Platform.storage.get(KEY) || '[]'); } catch(e) { mem = []; }
+  const flush = () => Platform.storage.set(KEY, JSON.stringify(mem.slice(-MAX)));
+  const push = (level, args) => {
+    const msg = args.map(a => a instanceof Error ? (a.message + ' @ ' + (a.stack||'').split('\n')[1]) :
+                              typeof a === 'object' ? safeStringify(a) : String(a)).join(' ');
+    const entry = { t: Date.now(), l: level, m: msg.slice(0, 500) };
+    mem.push(entry);
+    if (mem.length > MAX) mem.splice(0, mem.length - MAX);
+    flush();
+    const fn = console[level] || console.log;
+    fn(`[${level}]`, ...args);
+  };
+  return {
+    info:  (...a) => push('info',  a),
+    warn:  (...a) => push('warn',  a),
+    error: (...a) => push('error', a),
+    debug: (...a) => push('debug', a),
+    get all() { return mem.slice(); },
+    clear() { mem = []; flush(); },
+    export() {
+      const lines = mem.map(e => `[${new Date(e.t).toISOString()}] ${e.l.toUpperCase()} ${e.m}`).join('\n');
+      const blob = new Blob([lines], { type:'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `photo_app_log_${Date.now()}.txt`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    },
+  };
+})();
+
+function safeStringify(o) { try { return JSON.stringify(o).slice(0,300); } catch(e) { return '[unserializable]'; } }
+
+window.addEventListener('error', e => Log.error('window.error:', e.message, '@', e.filename + ':' + e.lineno));
+window.addEventListener('unhandledrejection', e => Log.error('unhandledrejection:', e.reason?.message || e.reason));
+
+Log.info('App boot. UA=', navigator.userAgent.slice(0,80), 'secure=', Platform.secureContext());
+
+/* ═══════════════════════════════════════════════════════
+   Backup — last N finalized photos kept in IndexedDB so
+   the user can recover after an accidental reload or
+   navigation. We also keep the last burst so AI compose
+   can be retried without re-shooting.
+═══════════════════════════════════════════════════════ */
+
+const Backup = (() => {
+  const DB = 'photoApp', STORE = 'shots', MAX_FINALS = 5;
+  function open() {
+    return new Promise((res, rej) => {
+      const req = indexedDB.open(DB, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath:'id' });
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error);
+    });
+  }
+  async function put(id, payload) {
+    try {
+      const db = await open();
+      await new Promise((res, rej) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).put({ id, t: Date.now(), ...payload });
+        tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+      });
+      Log.debug('Backup put', id);
+    } catch (e) { Log.warn('Backup put failed:', e.message); }
+  }
+  async function get(id) {
+    try {
+      const db = await open();
+      return await new Promise((res, rej) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const rq = tx.objectStore(STORE).get(id);
+        rq.onsuccess = () => res(rq.result || null);
+        rq.onerror   = () => rej(rq.error);
+      });
+    } catch (e) { Log.warn('Backup get failed:', e.message); return null; }
+  }
+  async function list() {
+    try {
+      const db = await open();
+      return await new Promise((res, rej) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const rq = tx.objectStore(STORE).getAll();
+        rq.onsuccess = () => res(rq.result || []);
+        rq.onerror   = () => rej(rq.error);
+      });
+    } catch (e) { return []; }
+  }
+  async function trimFinals() {
+    const all = await list();
+    const finals = all.filter(x => x.id.startsWith('final:')).sort((a,b) => b.t - a.t);
+    if (finals.length <= MAX_FINALS) return;
+    const db = await open();
+    for (const e of finals.slice(MAX_FINALS)) {
+      await new Promise((res) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        tx.objectStore(STORE).delete(e.id);
+        tx.oncomplete = res; tx.onerror = res;
+      });
+    }
+  }
+  return {
+    saveBurst: (shots) => put('burst:last', { shots }),
+    loadBurst: () => get('burst:last').then(x => x?.shots || []),
+    saveFinal: async (url, meta) => { await put('final:' + Date.now(), { url, meta }); trimFinals(); },
+    listFinals: async () => (await list()).filter(x => x.id.startsWith('final:')).sort((a,b) => b.t - a.t),
+    clear: async () => {
+      try { const db = await open();
+        await new Promise(res => { const tx = db.transaction(STORE,'readwrite'); tx.objectStore(STORE).clear(); tx.oncomplete = res; tx.onerror = res; });
+      } catch(e) {}
+    },
+  };
+})();
+
+/* ═══════════════════════════════════════════════════════
+   AI backend abstraction — current direct Gemini path;
+   Telegram bot proxy is stubbed for future implementation.
+═══════════════════════════════════════════════════════ */
+
+class GeminiDirectBackend {
+  constructor(key) { this.key = key; }
+  get configured() { return !!this.key; }
+
+  async compose(images, refMetrics, childSrc) {
+    if (!this.configured) throw new Error('Не задан API-ключ Gemini');
+    const refTxt = refMetrics
+      ? `Reference proportions to preserve: interocular distance ≈ ${refMetrics.iod.toFixed(3)}× bbox width, eye-to-chin ≈ ${refMetrics.e2c.toFixed(3)}× bbox height, nose-to-mouth ≈ ${refMetrics.n2m.toFixed(3)}× bbox height.`
+      : '';
+    const srcTxt = childSrc === 'upload'
+      ? 'These photos were taken at different times/places — clothing, lighting and background may vary. Identify the consistent facial geometry across them and ignore clothing/background. '
+      : 'These are a 5-shot burst taken seconds apart under the same lighting. ';
+    const prompt =
+      'You are generating an ID document photo for a Russian passport (35×45 mm). ' +
+      'Compose a single fronto-parallel portrait from the provided photos of the SAME child. ' +
+      srcTxt +
+      'STRICT REQUIREMENTS: ' +
+      '1) Face directly toward camera, eyes open, mouth closed, neutral expression. ' +
+      '2) PRESERVE FACIAL GEOMETRY EXACTLY: do not change interocular distance, nose length, chin width, eye shape, ear position, head proportions. These must match the input photos within 5%. ' +
+      '3) Plain white/light-gray background, even soft lighting, no shadows on face or background. ' +
+      '4) Hair, skin tone, freckles, birthmarks, eyebrows and eyelashes must be preserved as in the originals. ' +
+      '5) Head occupies 70–80% of frame height, eyes at 56–70% from bottom. ' +
+      '6) Output aspect ratio 35:45 (portrait). ' +
+      '7) Do not change the apparent age of the child. ' +
+      refTxt;
+    const parts = [
+      { text: prompt },
+      ...images.map(img => ({ inline_data:{ mime_type:'image/jpeg', data: img.dataUrl.split(',')[1] } }))
+    ];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(this.key)}`;
+    const r = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contents:[{ parts }] })
+    });
+    if (!r.ok) {
+      const t = await r.text();
+      throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`);
+    }
+    const j = await r.json();
+    const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
+    if (!out) throw new Error('AI не вернул изображение. Возможно, фильтр безопасности отклонил запрос.');
+    return 'data:' + out.mime_type + ';base64,' + out.data;
+  }
+
+  async estimateAge(dataUrl) {
+    if (!this.configured) throw new Error('Не задан API-ключ Gemini');
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(this.key)}`;
+    const r = await fetch(url, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents:[{ parts:[
+          { text:'What is the approximate age in years of the person in this photo? Respond with a single integer number only, no other text.' },
+          { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
+        ]}],
+        generationConfig:{ temperature:0, maxOutputTokens:8 }
+      })
+    });
+    if (!r.ok) return null;
+    const j = await r.json();
+    const txt = j.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const n = parseInt(txt.match(/\d+/)?.[0] || '', 10);
+    return Number.isFinite(n) ? n : null;
+  }
+}
+
+class TelegramProxyBackend {
+  constructor(opts) { this.botUrl = opts?.botUrl || ''; this.token = opts?.token || ''; }
+  get configured() { return !!this.botUrl; }
+  async compose() {
+    throw new Error('Telegram-бэкенд ещё не настроен на сервере. Используйте прямой Gemini.');
+  }
+  async estimateAge() { return null; }
+  // Architecture stub: real impl would POST {images, prompt} → bot returns jobId, then poll(jobId) until image.
+  async submit(_payload) { throw new Error('TelegramProxyBackend.submit: not implemented'); }
+  async poll(_jobId) { throw new Error('TelegramProxyBackend.poll: not implemented'); }
+}
+
+function makeAiBackend() {
+  const kind = Platform.storage.get('aiBackend') || 'gemini';
+  if (kind === 'telegram') {
+    return new TelegramProxyBackend({
+      botUrl: Platform.storage.get('tgBotUrl') || '',
+      token:  Platform.storage.get('tgBotToken') || '',
+    });
+  }
+  return new GeminiDirectBackend(Platform.storage.get('geminiKey') || '');
+}
+
+let gAi = makeAiBackend();
+
+/* ═══════════════════════════════════════════════════════
+   State
+═══════════════════════════════════════════════════════ */
+
+let gType='passport';
+let gMode='single';          // 'single' | 'child'
+let gChildSrc='burst';        // 'burst' | 'upload'
+let gFacing='user';
+let gBgRemove=false;
+let gPortrait=false;          // native backgroundBlur enabled
+let gPortraitCapable=false;
+let gCaptured=false;
+let gPaper='10x15';           // print sheet paper
+
 let gFs='init', gHs='init', gLs='init';
 let gStream=null, gRaf=null, gAnalyzeTimer=null, gPollTimer=null;
 let gVideoReady=false, gModelReady=false, gBgLoaded=false, gRemoveBg=null;
 
-// DOM
+let gShots = [];              // {dataUrl, metrics, age}
+let gRefMetrics = null;
+let gRefAge = null;
+
+/* ═══════════════════════════════════════════════════════
+   DOM references
+═══════════════════════════════════════════════════════ */
+
 const vid    = document.getElementById('vid');
 const ov     = document.getElementById('ov');
 const octx   = ov.getContext('2d');
 const vfEl   = document.getElementById('vf');
 const hintEl = document.getElementById('hint');
-const capBtn = document.getElementById('capBtn');
+const ctrlEl = document.getElementById('ctrl');
 const capCv  = document.createElement('canvas');
 const capCtx = capCv.getContext('2d');
+const fileSingle = document.getElementById('fileSingle');
+const fileMulti  = document.getElementById('fileMulti');
 
-// ── Init ──────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════
+   Init
+═══════════════════════════════════════════════════════ */
+
+initAdSlots();
 renderReqs();
-// Start camera automatically (page is HTTPS via GitHub Pages = allowed)
-startCamera();
-// Load face model after camera is up
-setTimeout(loadFaceModel, 3000);
+renderCtrl();
 
-// ── Camera ────────────────────────────────────────────
+if (!Platform.secureContext()) {
+  showCamError({ name:'InsecureContext' });
+} else {
+  startCamera();
+  setTimeout(loadFaceModel, 2000);
+}
+
+fileSingle.onchange = e => { const f = e.target.files?.[0]; if (f) ingestSingleFile(f); fileSingle.value=''; };
+fileMulti.onchange  = e => { const fs = [...(e.target.files||[])]; if (fs.length) ingestUploads(fs); fileMulti.value=''; };
+
+/* ═══════════════════════════════════════════════════════
+   Ad slots
+═══════════════════════════════════════════════════════ */
+
+function initAdSlots() {
+  const enabled = Platform.storage.get('ads') === '1'
+                  || new URLSearchParams(location.search).get('ads') === '1';
+  if (!enabled || Platform.isAndroid) return;
+  document.querySelectorAll('[data-ad-slot]').forEach(el => {
+    el.classList.add('show');
+    el.textContent = `[ad: ${el.dataset.adSlot}]`;
+    // SDK injection point: an external ad library would render into el here.
+    // Example: window.AdProvider?.render(el, { slot: el.dataset.adSlot });
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   Camera
+═══════════════════════════════════════════════════════ */
+
 async function startCamera() {
+  if (!Platform.secureContext()) { showCamError({ name:'InsecureContext' }); return; }
   gVideoReady = false;
-  if (gStream) { gStream.getTracks().forEach(t=>t.stop()); gStream=null; }
+  if (gStream) { gStream.getTracks().forEach(t => t.stop()); gStream = null; }
   clearTimeout(gPollTimer);
   cancelAnimationFrame(gRaf);
   clearTimeout(gAnalyzeTimer);
 
+  vfEl.querySelectorAll('.cam-err,.tap-start').forEach(e => e.remove());
   vid.srcObject = null;
-  vid.className = gFacing==='user' ? 'mirror' : '';
-  setHint('Запуск камеры...');
+  vid.className = gFacing === 'user' ? 'mirror' : '';
+  setHint('Запуск камеры…');
 
-  // Try with ideal constraints, then fallback
   let stream;
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video:{ facingMode:gFacing, width:{ideal:1280}, height:{ideal:720} },
       audio:false
     });
-  } catch(e1) {
-    console.warn('Constraint getUserMedia failed:', e1.name, '— trying fallback');
+  } catch (e1) {
+    console.warn('getUserMedia ideal failed:', e1.name);
     try {
       stream = await navigator.mediaDevices.getUserMedia({ video:true, audio:false });
-    } catch(e2) {
+    } catch (e2) {
       showCamError(e2);
       return;
     }
@@ -241,31 +596,35 @@ async function startCamera() {
   gStream = stream;
   vid.srcObject = stream;
 
-  // Three event listeners — whichever fires first triggers onVideoReady
-  const onReady = () => { if (!gVideoReady) onVideoReady(); };
-  vid.addEventListener('loadedmetadata', onReady, {once:true});
-  vid.addEventListener('canplay',        onReady, {once:true});
-  vid.addEventListener('playing',        onReady, {once:true});
+  detectPortraitCapability(stream);
 
-  // Polling fallback: if no event fires within 2s, check videoWidth directly
+  const onReady = () => { if (!gVideoReady) onVideoReady(); };
+  vid.addEventListener('loadedmetadata', onReady, { once:true });
+  vid.addEventListener('canplay',        onReady, { once:true });
+  vid.addEventListener('playing',        onReady, { once:true });
+
   let pollCount = 0;
   const poll = () => {
     if (gVideoReady) return;
     if (vid.videoWidth > 0) { onVideoReady(); return; }
-    if (++pollCount < 40) { gPollTimer = setTimeout(poll, 200); }   // 8s total
-    else showCamError({name:'TimeoutError', message:'Камера не ответила за 8 секунд'});
+    if (++pollCount < 40) gPollTimer = setTimeout(poll, 200);
+    else showTapToStart();   // 8s with no signal — likely autoplay blocked
   };
   gPollTimer = setTimeout(poll, 500);
 
-  // Try to play (needed on some Android)
-  try { await vid.play(); } catch(e) { console.warn('play():', e); }
+  try {
+    await vid.play();
+  } catch (e) {
+    console.warn('play() rejected:', e?.name || e);
+    if (e?.name === 'NotAllowedError') showTapToStart();
+  }
 }
 
 function onVideoReady() {
   if (gVideoReady) return;
   gVideoReady = true;
   clearTimeout(gPollTimer);
-  setHint('Совместите лицо с овалом');
+  setHint(gMode === 'child' ? 'Готовы снять серию' : 'Совместите лицо с овалом');
   startOverlay();
   scheduleAnalysis(800);
 }
@@ -273,23 +632,70 @@ function onVideoReady() {
 function showCamError(err) {
   clearTimeout(gPollTimer);
   let msg = 'Нет доступа к камере.';
-  if (err.name === 'NotAllowedError')  msg = 'Доступ к камере запрещён.\nОткройте Настройки → Приложения → Chrome → Разрешения → Камера → Разрешить.';
-  else if (err.name === 'NotFoundError')   msg = 'Камера не найдена на устройстве.';
+  if (err.name === 'InsecureContext') msg = 'Откройте приложение по HTTPS (или localhost). По <code>file://</code> браузер не выдаёт доступ к камере.\n\nПодсказка: <code>python3 -m http.server</code>';
+  else if (err.name === 'NotAllowedError') msg = 'Доступ к камере запрещён.\nНастройки → Сайт → Камера → Разрешить.';
+  else if (err.name === 'NotFoundError') msg = 'Камера не найдена на устройстве.';
   else if (err.name === 'NotReadableError') msg = 'Камера занята другим приложением.';
-  else if (err.name === 'TimeoutError')    msg = err.message;
-  else msg = `${err.name}: ${err.message}`;
-  vfEl.querySelectorAll('.cam-err').forEach(e=>e.remove());
-  vfEl.insertAdjacentHTML('beforeend',
-    `<div class="cam-err"><b>📷</b>${msg.replace(/\n/g,'<br>')}</div>`);
+  else msg = `${err.name||'Error'}: ${err.message||err}`;
+  vfEl.querySelectorAll('.cam-err,.tap-start').forEach(e => e.remove());
+  const div = document.createElement('div');
+  div.className = 'cam-err';
+  div.innerHTML = `<b>📷</b><div>${msg.replace(/\n/g,'<br>')}</div>` +
+    (err.name === 'InsecureContext'
+      ? ''
+      : `<button onclick="startCamera()">Повторить</button>`);
+  vfEl.appendChild(div);
 }
 
-// ── Overlay loop ──────────────────────────────────────
+function showTapToStart() {
+  clearTimeout(gPollTimer);
+  if (vfEl.querySelector('.tap-start')) return;
+  const div = document.createElement('div');
+  div.className = 'tap-start';
+  div.innerHTML = `<b>▶</b><p>Нажмите для запуска камеры</p>`;
+  div.onclick = () => { div.remove(); startCamera(); };
+  vfEl.appendChild(div);
+}
+
+async function detectPortraitCapability(stream) {
+  gPortraitCapable = false;
+  try {
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities?.() || {};
+    if ('backgroundBlur' in caps || 'backgroundSegmentationMask' in caps) {
+      gPortraitCapable = true;
+      renderCtrl();
+    }
+  } catch (e) { /* silent */ }
+}
+
+async function togglePortrait() {
+  if (!gStream || !gPortraitCapable) return;
+  gPortrait = !gPortrait;
+  try {
+    const track = gStream.getVideoTracks()[0];
+    const caps = track.getCapabilities?.() || {};
+    const c = {};
+    if ('backgroundBlur' in caps) c.backgroundBlur = gPortrait;
+    else if ('backgroundSegmentationMask' in caps) c.backgroundSegmentationMask = gPortrait;
+    await track.applyConstraints({ advanced:[c] });
+    renderCtrl();
+  } catch (e) {
+    toast('Портретный режим не применился: ' + (e.message||e), 'warn');
+    gPortrait = false; renderCtrl();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Overlay loop
+═══════════════════════════════════════════════════════ */
+
 function startOverlay() {
   cancelAnimationFrame(gRaf);
   const loop = () => {
     if (gCaptured) return;
     const W=vfEl.clientWidth, H=vfEl.clientHeight;
-    if (ov.width!==W||ov.height!==H) { ov.width=W; ov.height=H; }
+    if (ov.width!==W || ov.height!==H) { ov.width=W; ov.height=H; }
     octx.clearRect(0,0,W,H);
     drawGuides(W,H);
     gRaf = requestAnimationFrame(loop);
@@ -297,322 +703,1062 @@ function startOverlay() {
   gRaf = requestAnimationFrame(loop);
 }
 
-// ── Guide drawing ─────────────────────────────────────
-function drawGuides(W,H) {
-  const {aspect,size}=TYPES[gType];
-  let fH=H*.83,fW=fH*aspect;
-  if(fW>W*.78){fW=W*.78;fH=fW/aspect;}
-  const fX=(W-fW)/2|0, fY=(H-fH)/2|0;
+function drawGuides(W, H) {
+  const t = TYPES[gType];
+  let fH = H*.83, fW = fH * t.aspect;
+  if (fW > W*.78) { fW = W*.78; fH = fW / t.aspect; }
+  const fX = (W-fW)/2 | 0, fY = (H-fH)/2 | 0;
 
-  // Vignette
-  octx.fillStyle='rgba(0,0,0,.52)';
+  octx.fillStyle = 'rgba(0,0,0,.52)';
   octx.fillRect(0,0,W,fY);
   octx.fillRect(0,fY+fH,W,H-fY-fH);
   octx.fillRect(0,fY,fX,fH);
   octx.fillRect(fX+fW,fY,W-fX-fW,fH);
 
-  // Colours by status
-  const allOk = gFs==='ok'&&(gHs==='ok'||gHs==='na');
-  const anyWarn = gFs!=='ok'&&gFs!=='init'&&gFs!=='na';
-  const cc = allOk?'#4ade80':'#F5C842';
-  const oc = allOk?'rgba(74,222,128,.85)':anyWarn?'rgba(249,115,22,.8)':'rgba(245,200,66,.55)';
+  const allOk = gFs==='ok' && (gHs==='ok'||gHs==='na');
+  const anyWarn = gFs!=='ok' && gFs!=='init' && gFs!=='na';
+  const cc = allOk ? '#4ade80' : '#F5C842';
+  const oc = allOk ? 'rgba(74,222,128,.85)' : anyWarn ? 'rgba(249,115,22,.8)' : 'rgba(245,200,66,.55)';
 
-  // Frame
-  octx.strokeStyle='rgba(232,213,163,.45)';octx.lineWidth=1.5;octx.setLineDash([]);
+  octx.strokeStyle='rgba(232,213,163,.45)'; octx.lineWidth=1.5; octx.setLineDash([]);
   octx.strokeRect(fX,fY,fW,fH);
 
-  // Corners
-  const L=Math.min(fW,fH)*.1|0;
-  octx.strokeStyle=cc;octx.lineWidth=3;octx.lineCap='round';
+  const L = Math.min(fW,fH)*.1 | 0;
+  octx.strokeStyle = cc; octx.lineWidth = 3; octx.lineCap = 'round';
   [[fX,fY,1,1],[fX+fW,fY,-1,1],[fX,fY+fH,1,-1],[fX+fW,fY+fH,-1,-1]].forEach(([x,y,dx,dy])=>{
-    octx.beginPath();octx.moveTo(x+dx*L,y);octx.lineTo(x,y);octx.lineTo(x,y+dy*L);octx.stroke();
+    octx.beginPath(); octx.moveTo(x+dx*L,y); octx.lineTo(x,y); octx.lineTo(x,y+dy*L); octx.stroke();
   });
 
-  // Oval
-  octx.strokeStyle=oc;octx.lineWidth=2;octx.setLineDash([6,4]);
-  octx.beginPath();
-  octx.ellipse(fX+fW/2,fY+fH*FR.ovalCY,fW*FR.ovalW/2,fH*FR.ovalH/2,0,0,Math.PI*2);
-  octx.stroke();octx.setLineDash([]);
+  // Per-type ratios — derive oval/eye/chin from physical specs
+  const ovalH = (t.headPctMin + t.headPctMax)/2;                     // ≈0.75
+  const eyeY = 1 - (t.eyeFromBottomMin + t.eyeFromBottomMax)/2;      // from top
+  const ovalCY = eyeY + (.85 - eyeY)*.25;                            // visual center between eyes and chin
+  const ovalW = ovalH * 0.73;                                         // typical head w/h ≈ 0.7–0.75
 
-  // Guide lines
-  const eY=fY+fH*FR.eyeY,crY=fY+fH*FR.crownY,chY=fY+fH*FR.chinY;
-  octx.lineWidth=1;octx.setLineDash([4,6]);
+  octx.strokeStyle = oc; octx.lineWidth = 2; octx.setLineDash([6,4]);
+  octx.beginPath();
+  octx.ellipse(fX+fW/2, fY+fH*ovalCY, fW*ovalW/2, fH*ovalH/2, 0, 0, Math.PI*2);
+  octx.stroke(); octx.setLineDash([]);
+
+  const eY = fY + fH*eyeY, crY = fY + fH*.11, chY = fY + fH*.85;
+  octx.lineWidth = 1; octx.setLineDash([4,6]);
   octx.strokeStyle='rgba(245,200,66,.3)';
-  octx.beginPath();octx.moveTo(fX+fW*.28,crY);octx.lineTo(fX+fW*.72,crY);octx.stroke();
-  octx.beginPath();octx.moveTo(fX+fW*.28,chY);octx.lineTo(fX+fW*.72,chY);octx.stroke();
+  octx.beginPath(); octx.moveTo(fX+fW*.28,crY); octx.lineTo(fX+fW*.72,crY); octx.stroke();
+  octx.beginPath(); octx.moveTo(fX+fW*.28,chY); octx.lineTo(fX+fW*.72,chY); octx.stroke();
   octx.strokeStyle='rgba(100,200,255,.3)';
-  octx.beginPath();octx.moveTo(fX+fW*.18,eY);octx.lineTo(fX+fW*.82,eY);octx.stroke();
+  octx.beginPath(); octx.moveTo(fX+fW*.18,eY); octx.lineTo(fX+fW*.82,eY); octx.stroke();
   octx.setLineDash([]);
 
-  // Labels
-  if(W-(fX+fW)>36){
-    const lb=fX+fW+8;
+  if (W-(fX+fW) > 36) {
+    const lb = fX+fW+8;
     octx.font='10px monospace';
     octx.fillStyle='rgba(245,200,66,.6)';
-    octx.fillText('темя',lb,crY+4);octx.fillText('подб.',lb,chY+4);
-    octx.fillStyle='rgba(100,200,255,.6)';octx.fillText('глаза',lb,eY+4);
+    octx.fillText('темя', lb, crY+4); octx.fillText('подб.', lb, chY+4);
+    octx.fillStyle='rgba(100,200,255,.6)'; octx.fillText('глаза', lb, eY+4);
   }
-  octx.font=Math.max(11,fW*.055|0)+'px monospace';
-  octx.fillStyle='rgba(232,213,163,.65)';octx.textAlign='center';
-  octx.fillText(size,fX+fW/2,fY-7);octx.textAlign='left';
+  octx.font = Math.max(11, fW*.055 | 0) + 'px monospace';
+  octx.fillStyle='rgba(232,213,163,.65)'; octx.textAlign='center';
+  octx.fillText(t.size, fX+fW/2, fY-7);
+  octx.textAlign='left';
 }
 
-// ── Analysis ──────────────────────────────────────────
-function scheduleAnalysis(d){clearTimeout(gAnalyzeTimer);gAnalyzeTimer=setTimeout(runAnalysis,d||700);}
+/* ═══════════════════════════════════════════════════════
+   Analysis (face detection + lighting)
+═══════════════════════════════════════════════════════ */
 
-async function runAnalysis(){
-  if(gCaptured||!vid.videoWidth){scheduleAnalysis(500);return;}
+function scheduleAnalysis(d) { clearTimeout(gAnalyzeTimer); gAnalyzeTimer = setTimeout(runAnalysis, d||700); }
 
-  // Brightness
-  try{
-    const W2=64,H2=48,t=document.createElement('canvas');
-    t.width=W2;t.height=H2;
+async function runAnalysis() {
+  if (gCaptured || !vid.videoWidth) { scheduleAnalysis(500); return; }
+
+  try {
+    const W2=64, H2=48, t=document.createElement('canvas');
+    t.width=W2; t.height=H2;
     const tc=t.getContext('2d');
-    tc.drawImage(vid,vid.videoWidth*.25,vid.videoHeight*.15,vid.videoWidth*.5,vid.videoHeight*.7,0,0,W2,H2);
-    const d=tc.getImageData(0,0,W2,H2).data;
-    let s=0,l=0,r=0;
-    for(let i=0;i<W2*H2;i++){
-      const b=.299*d[i*4]+.587*d[i*4+1]+.114*d[i*4+2];
-      s+=b;(i%W2<W2/2?l:r)+=b;
+    tc.drawImage(vid, vid.videoWidth*.25, vid.videoHeight*.15, vid.videoWidth*.5, vid.videoHeight*.7, 0, 0, W2, H2);
+    const d = tc.getImageData(0,0,W2,H2).data;
+    let s=0, l=0, r=0;
+    for (let i=0; i<W2*H2; i++) {
+      const b = .299*d[i*4] + .587*d[i*4+1] + .114*d[i*4+2];
+      s += b;
+      if (i%W2 < W2/2) l += b; else r += b;
     }
-    const avg=s/(W2*H2),ev=avg>0?Math.abs(l-r)/(avg*W2*H2):0;
-    gLs=avg<72?'dark':avg>228?'bright':ev>.30?'uneven':'ok';
-  }catch(e){gLs='ok';}
+    const avg = s/(W2*H2), ev = avg>0 ? Math.abs(l-r)/(avg*W2*H2) : 0;
+    gLs = avg<72 ? 'dark' : avg>228 ? 'bright' : ev>.30 ? 'uneven' : 'ok';
+  } catch (e) { gLs = 'ok'; }
 
-  // Face detection
-  if(gModelReady&&window._fd){
-    try{await window._fd.send({image:vid});}
-    catch(e){gFs='na';gHs='na';}
-  } else if(!gModelReady&&gFs==='init'){
-    gFs='na';gHs='na';
+  if (gModelReady && window._fd) {
+    try { await window._fd.send({ image:vid }); }
+    catch (e) { gFs='na'; gHs='na'; }
+  } else if (!gModelReady && gFs === 'init') {
+    gFs='na'; gHs='na';
   }
 
   updateStatus();
   scheduleAnalysis(700);
 }
 
-// ── Face detection model ──────────────────────────────
-function loadFaceModel(){
-  const s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js';
-  s.onload=()=>{
-    try{
-      const fd=new FaceDetection({locateFile:f=>'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/'+f});
-      fd.setOptions({model:'short',minDetectionConfidence:0.5});
-      fd.onResults(r=>{
-        if(gCaptured)return;
-        if(!r.detections||!r.detections.length){gFs='none';gHs='na';updateStatus();return;}
-        const det=r.detections[0],bb=det.boundingBox,lm=det.landmarks;
-        const cx=bb.xCenter,cy=bb.yCenter,nh=bb.height,nw=bb.width;
-        gFs=nh<.28?'far':nh>.84?'close':Math.abs(cx-.5)>.16||Math.abs(cy-.47)>.17?'center':'ok';
-        if(lm&&lm.length>=4){
-          const re=lm[0],le=lm[1],nose=lm[2],mouth=lm[3];
-          const roll=Math.atan2(le.y-re.y,le.x-re.x)*180/Math.PI;
-          const yaw=(nose.x-(re.x+le.x)/2)/nw;
-          const e2n=(nose.y-(re.y+le.y)/2)/nh,n2m=(mouth.y-nose.y)/nh;
-          gHs=roll>9?'tilt_r':roll<-9?'tilt_l':yaw>.09?'turn_r':yaw<-.09?'turn_l':
-              e2n<.18||n2m>.42?'up':e2n>.44||n2m<.10?'down':'ok';
-        }else{gHs='na';}
+let _fdLiveHandler = null;  // saved reference so static measurement can restore it
+
+function loadFaceModel() {
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/face_detection.js';
+  s.onload = () => {
+    try {
+      const fd = new FaceDetection({ locateFile: f => 'https://cdn.jsdelivr.net/npm/@mediapipe/face_detection@0.4/' + f });
+      fd.setOptions({ model:'short', minDetectionConfidence:0.5 });
+      _fdLiveHandler = r => {
+        if (gCaptured) return;
+        if (!r.detections || !r.detections.length) { gFs='none'; gHs='na'; updateStatus(); return; }
+        const det = r.detections[0], bb = det.boundingBox, lm = det.landmarks;
+        const cx = bb.xCenter, cy = bb.yCenter, nh = bb.height, nw = bb.width;
+        gFs = nh<.28 ? 'far' : nh>.84 ? 'close'
+              : (Math.abs(cx-.5)>.16 || Math.abs(cy-.47)>.17) ? 'center' : 'ok';
+        if (lm && lm.length >= 4) {
+          const re=lm[0], le=lm[1], nose=lm[2], mouth=lm[3];
+          const roll = Math.atan2(le.y-re.y, le.x-re.x)*180/Math.PI;
+          const yaw  = (nose.x - (re.x+le.x)/2)/nw;
+          const e2n  = (nose.y - (re.y+le.y)/2)/nh;
+          const n2m  = (mouth.y - nose.y)/nh;
+          gHs = roll>9 ? 'tilt_r' : roll<-9 ? 'tilt_l'
+              : yaw>.09 ? 'turn_r' : yaw<-.09 ? 'turn_l'
+              : (e2n<.18 || n2m>.42) ? 'up' : (e2n>.44 || n2m<.10) ? 'down' : 'ok';
+        } else gHs='na';
         updateStatus();
-      });
-      window._fd=fd;gModelReady=true;
-    }catch(e){console.warn('FD init:',e);}
+      };
+      fd.onResults(_fdLiveHandler);
+      window._fd = fd;
+      gModelReady = true;
+      Log.info('MediaPipe FaceDetection ready');
+    } catch (e) {
+      Log.error('FD init failed:', e);
+      setHint('Детектор лица не загрузился — продолжайте вручную', 'warn');
+    }
   };
-  s.onerror=()=>console.warn('FD load failed');
+  s.onerror = () => {
+    Log.error('FD load failed (CDN blocked?)');
+    setHint('Детектор лица не загрузился (CDN заблокирован?). Продолжайте вручную.', 'warn');
+    gFs='na'; gHs='na'; updateStatus();
+  };
   document.head.appendChild(s);
 }
 
-// ── Status ────────────────────────────────────────────
-const PCFG={
-  face:{init:['#555','Поз. лица...'],na:['#888','Поз. — вручную'],
-    none:['#ef4444','Лицо не найдено'],close:['#f97316','Отойдите'],
-    far:['#f97316','Подойдите ближе'],center:['#f97316','Выровняйте'],ok:['#4ade80','Позиция ✓']},
-  head:{init:['#555','Голова...'],na:['#888','Голова — вручную'],
-    tilt_l:['#f97316','Наклон влево'],tilt_r:['#f97316','Наклон вправо'],
-    turn_l:['#f97316','Вправо'],turn_r:['#f97316','Влево'],
-    up:['#f97316','Подбородок ↓'],down:['#f97316','Подбородок ↑'],ok:['#4ade80','Голова ✓']},
-  light:{init:['#555','Свет...'],dark:['#ef4444','Темно'],
-    bright:['#f97316','Ярко'],uneven:['#f97316','Неравный свет'],ok:['#4ade80','Свет ✓']},
+/* ═══════════════════════════════════════════════════════
+   Status bar
+═══════════════════════════════════════════════════════ */
+
+const PCFG = {
+  face: { init:['#555','Поз. лица…'], na:['#888','Поз. — вручную'],
+          none:['#ef4444','Лицо не найдено'], close:['#f97316','Отойдите'],
+          far:['#f97316','Подойдите ближе'], center:['#f97316','Выровняйте'], ok:['#4ade80','Позиция ✓'] },
+  head: { init:['#555','Голова…'], na:['#888','Голова — вручную'],
+          tilt_l:['#f97316','Наклон влево'], tilt_r:['#f97316','Наклон вправо'],
+          turn_l:['#f97316','Вправо'], turn_r:['#f97316','Влево'],
+          up:['#f97316','Подбородок ↓'], down:['#f97316','Подбородок ↑'], ok:['#4ade80','Голова ✓'] },
+  light:{ init:['#555','Свет…'], dark:['#ef4444','Темно'],
+          bright:['#f97316','Ярко'], uneven:['#f97316','Неравный свет'], ok:['#4ade80','Свет ✓'] },
 };
 
-function setPill(id,type,st){
-  const el=document.getElementById(id);if(!el)return;
-  const[dot,text]=(PCFG[type][st]||PCFG[type].init);
-  el.style.borderColor=dot==='#4ade80'?'rgba(74,222,128,.22)':'rgba(255,255,255,.07)';
-  el.innerHTML=`<div class="sd" style="background:${dot}"></div><span class="st" style="color:${dot}">${text}</span>`;
-}
-function isReady(){return gFs==='ok'&&(gHs==='ok'||gHs==='na')&&gLs==='ok';}
-function setHint(txt,cls){hintEl.textContent=txt;hintEl.className='hint'+(cls?' '+cls:'');}
-function updateStatus(){
-  setPill('sp0','face',gFs);setPill('sp1','head',gHs);setPill('sp2','light',gLs);
-  const f=gFs,h=gHs,l=gLs;
-  if(f==='init')       setHint('Инициализация...');
-  else if(f==='none')  setHint('Встаньте перед камерой','warn');
-  else if(f==='close') setHint('Отойдите дальше','warn');
-  else if(f==='far')   setHint('Подойдите ближе','warn');
-  else if(f==='center')setHint('Выровняйте лицо','warn');
-  else if(h==='tilt_l')setHint('Наклоните голову вправо','warn');
-  else if(h==='tilt_r')setHint('Наклоните голову влево','warn');
-  else if(h==='turn_l')setHint('Повернитесь правее','warn');
-  else if(h==='turn_r')setHint('Повернитесь левее','warn');
-  else if(h==='up')    setHint('Опустите подбородок','warn');
-  else if(h==='down')  setHint('Поднимите подбородок','warn');
-  else if(l==='dark')  setHint('Добавьте освещения','warn');
-  else if(l==='bright')setHint('Уменьшите яркость','warn');
-  else if(l==='uneven')setHint('Нужен свет с двух сторон','warn');
-  else if(isReady())   setHint('✓ Готово — нажмите кнопку','ok');
-  else                 setHint('Совместите лицо с овалом');
-  capBtn.className='cbtn'+(isReady()?' rdy':'');
+function setPill(id, kind, st) {
+  const el = document.getElementById(id); if (!el) return;
+  const [dot, text] = (PCFG[kind][st] || PCFG[kind].init);
+  el.style.borderColor = dot==='#4ade80' ? 'rgba(74,222,128,.22)' : 'rgba(255,255,255,.07)';
+  el.innerHTML = `<div class="sd" style="background:${dot}"></div><span class="st" style="color:${dot}">${text}</span>`;
 }
 
-// ── Capture ───────────────────────────────────────────
-async function doCapture(){
-  if(!vid.videoWidth)return;
-  gCaptured=true;
-  cancelAnimationFrame(gRaf);clearTimeout(gAnalyzeTimer);
+function isReady() { return gFs==='ok' && (gHs==='ok'||gHs==='na') && gLs==='ok'; }
 
-  const fl=document.createElement('div');fl.className='flash';
-  vfEl.appendChild(fl);setTimeout(()=>fl.remove(),280);
+function setHint(txt, cls) { hintEl.textContent = txt; hintEl.className = 'hint' + (cls ? ' '+cls : ''); }
 
-  const po=document.createElement('div');po.className='proc';
-  po.innerHTML=`<div class="spin"></div><p>ОБРАБОТКА</p><small>${gBgRemove?'удаление фона · ':''}коррекция света</small>`;
-  vfEl.appendChild(po);
-  await new Promise(r=>setTimeout(r,80));
+function updateStatus() {
+  setPill('sp0','face',gFs); setPill('sp1','head',gHs); setPill('sp2','light',gLs);
+  const f=gFs, h=gHs, l=gLs;
+  if      (f==='init')   setHint('Инициализация…');
+  else if (f==='none')   setHint('Встаньте перед камерой','warn');
+  else if (f==='close')  setHint('Отойдите дальше','warn');
+  else if (f==='far')    setHint('Подойдите ближе','warn');
+  else if (f==='center') setHint('Выровняйте лицо','warn');
+  else if (h==='tilt_l') setHint('Наклоните голову вправо','warn');
+  else if (h==='tilt_r') setHint('Наклоните голову влево','warn');
+  else if (h==='turn_l') setHint('Повернитесь правее','warn');
+  else if (h==='turn_r') setHint('Повернитесь левее','warn');
+  else if (h==='up')     setHint('Опустите подбородок','warn');
+  else if (h==='down')   setHint('Поднимите подбородок','warn');
+  else if (l==='dark')   setHint('Добавьте освещения','warn');
+  else if (l==='bright') setHint('Уменьшите яркость','warn');
+  else if (l==='uneven') setHint('Нужен свет с двух сторон','warn');
+  else if (isReady())    setHint(gMode==='child' ? 'Готово — нажмите «Серия»' : '✓ Готово — нажмите кнопку','ok');
+  else                   setHint('Совместите лицо с овалом');
 
-  const{aspect}=TYPES[gType];
-  const vw=vid.videoWidth,vh=vid.videoHeight;
-  let cW,cH;
-  if(vw/vh>aspect){cH=vh;cW=(vh*aspect)|0;}else{cW=vw;cH=(vw/aspect)|0;}
-  const sx=((vw-cW)/2)|0,sy=((vh-cH)/2)|0;
-  capCv.width=cW;capCv.height=cH;
-  if(gFacing==='user'){
-    capCtx.save();capCtx.translate(cW,0);capCtx.scale(-1,1);
-    capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);capCtx.restore();
-  }else{
-    capCtx.drawImage(vid,sx,sy,cW,cH,0,0,cW,cH);
+  const capBtn = document.getElementById('capBtn');
+  if (capBtn) capBtn.className = 'cbtn' + (gMode==='child' ? ' child' : isReady() ? ' rdy' : '');
+}
+
+/* ═══════════════════════════════════════════════════════
+   Single-photo capture (existing flow)
+═══════════════════════════════════════════════════════ */
+
+async function doCapture() {
+  if (gMode === 'child') {
+    if (gChildSrc === 'burst') return captureBurst();
+    return fileMulti.click();
+  }
+  if (!vid.videoWidth) return;
+  gCaptured = true;
+  cancelAnimationFrame(gRaf); clearTimeout(gAnalyzeTimer);
+
+  const fl = document.createElement('div'); fl.className = 'flash';
+  vfEl.appendChild(fl); setTimeout(() => fl.remove(), 280);
+
+  const po = showProcessing(gBgRemove ? 'удаление фона · коррекция света' : 'коррекция света');
+  await new Promise(r => setTimeout(r, 80));
+
+  const { aspect } = TYPES[gType];
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  let cW, cH;
+  if (vw/vh > aspect) { cH = vh; cW = (vh*aspect)|0; }
+  else                { cW = vw; cH = (vw/aspect)|0; }
+  const sx = ((vw-cW)/2)|0, sy = ((vh-cH)/2)|0;
+  capCv.width = cW; capCv.height = cH;
+  if (gFacing === 'user') {
+    capCtx.save(); capCtx.translate(cW,0); capCtx.scale(-1,1);
+    capCtx.drawImage(vid, sx, sy, cW, cH, 0, 0, cW, cH); capCtx.restore();
+  } else {
+    capCtx.drawImage(vid, sx, sy, cW, cH, 0, 0, cW, cH);
   }
 
-  try{
-    if(gBgRemove&&gRemoveBg){
-      po.querySelector('small').textContent='удаление фона...';
-      const blob=await gRemoveBg(capCv,{model:'small',output:{format:'image/png',quality:.92}});
-      const url=URL.createObjectURL(blob);
-      await new Promise((res,rej)=>{
-        const img=new Image();
-        img.onload=()=>{
-          capCtx.fillStyle='#fff';capCtx.fillRect(0,0,cW,cH);
-          capCtx.drawImage(img,0,0,cW,cH);URL.revokeObjectURL(url);res();
-        };img.onerror=rej;img.src=url;
-      });
-    }else{
-      bgFloodFill(capCtx,cW,cH);
-    }
-    normLight(capCtx,cW,cH);
-  }catch(e){console.warn('post:',e);}
-
-  const url=capCv.toDataURL('image/jpeg',.95);
+  po.step('Постобработка');
+  po.substep('масштабируем до 300 DPI, фон, свет');
+  po.progress(0.5);
+  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: gPortrait });
+  po.progress(1);
   po.remove();
-  vid.style.display='none';ov.style.display='none';hintEl.style.display='none';
-  vfEl.insertAdjacentHTML('beforeend',
-    `<div class="prev-wrap"><img src="${url}"/><div class="prev-badge">✓ Фото готово</div></div>`);
-  document.getElementById('ctrl').innerHTML=
-    `<button class="abtn" onclick="retake()">↩ Переснять</button>
-     <button class="abtn p" onclick="dlPhoto('${url}')">↓ Сохранить</button>`;
-  document.getElementById('sbar').style.opacity='.35';
+  Backup.saveFinal(url, { kind:'single-camera', type: gType });
+  Log.info('Single capture done, type=', gType);
+  showPreview(url, { kind:'single' });
 }
 
-// ── Post-processing ───────────────────────────────────
-function bgFloodFill(c,w,h){
-  const id=c.getImageData(0,0,w,h),d=id.data;
-  let rS=0,gS=0,bS=0,n=0;
-  const add=(x,y)=>{const i=(y*w+x)*4;rS+=d[i];gS+=d[i+1];bS+=d[i+2];n++;};
-  for(let x=0;x<w;x++){add(x,0);add(x,1);add(x,h-1);add(x,h-2);}
-  for(let y=2;y<h-2;y++){add(0,y);add(1,y);add(w-1,y);add(w-2,y);}
-  const bgR=rS/n,bgG=gS/n,bgB=bS/n,thr=65;
-  const vis=new Uint8Array(w*h),q=[];
-  const enq=(x,y)=>{
-    if(x<0||x>=w||y<0||y>=h)return;
-    const idx=y*w+x;if(vis[idx])return;vis[idx]=1;
-    const i=idx*4,dr=d[i]-bgR,dg=d[i+1]-bgG,db=d[i+2]-bgB;
-    if(Math.sqrt(dr*dr+dg*dg+db*db)<thr)q.push(idx);
+/* showProcessing(initial) → { el, step(text), substep(text), progress(0..1), remove() }
+   Pass step() updates to surface real-time progress to the user. */
+function showProcessing(initial) {
+  const po = document.createElement('div'); po.className = 'proc';
+  po.innerHTML = `
+    <div class="spin"></div>
+    <p id="procStep">ОБРАБОТКА</p>
+    <small id="procSub">${initial || ''}</small>
+    <div id="procBar" style="width:200px;height:3px;background:rgba(232,213,163,.1);border-radius:2px;overflow:hidden;display:none;margin-top:6px">
+      <div id="procBarFill" style="width:0%;height:100%;background:#F5C842;transition:width .25s"></div>
+    </div>
+    <small id="procLog" style="font-size:8px;color:rgba(232,213,163,.3);max-width:280px;text-align:left;font-family:monospace;line-height:1.4;white-space:pre-wrap;max-height:80px;overflow:hidden"></small>`;
+  vfEl.appendChild(po);
+  const stepEl = po.querySelector('#procStep');
+  const subEl  = po.querySelector('#procSub');
+  const barEl  = po.querySelector('#procBar');
+  const fillEl = po.querySelector('#procBarFill');
+  const logEl  = po.querySelector('#procLog');
+  const tail = [];
+  const append = (text) => {
+    tail.push(`${new Date().toLocaleTimeString()} ${text}`);
+    while (tail.length > 6) tail.shift();
+    logEl.textContent = tail.join('\n');
   };
-  for(let x=0;x<w;x++){enq(x,0);enq(x,h-1);}
-  for(let y=1;y<h-1;y++){enq(0,y);enq(w-1,y);}
-  while(q.length){
-    const idx=q.pop(),x=idx%w,y=(idx/w)|0;
-    d[idx*4]=255;d[idx*4+1]=255;d[idx*4+2]=255;
-    enq(x+1,y);enq(x-1,y);enq(x,y+1);enq(x,y-1);
-  }
-  c.putImageData(id,0,0);
-}
-function normLight(c,w,h){
-  const id=c.getImageData(0,0,w,h),d=id.data;
-  const fx=w*.18|0,fy=h*.05|0,fw=w*.64|0,fh=h*.78|0;
-  let s=0,n=0;
-  for(let y=fy;y<Math.min(fy+fh,h);y++)
-    for(let x=fx;x<Math.min(fx+fw,w);x++){
-      const i=(y*w+x)*4;
-      if(d[i]>250&&d[i+1]>250&&d[i+2]>250)continue;
-      s+=.299*d[i]+.587*d[i+1]+.114*d[i+2];n++;
-    }
-  if(!n||!s)return;
-  const m=158/(s/n);if(Math.abs(m-1)<.06)return;
-  const cl=v=>Math.max(0,Math.min(255,v|0));
-  for(let y=fy;y<Math.min(fy+fh,h);y++)
-    for(let x=fx;x<Math.min(fx+fw,w);x++){
-      const i=(y*w+x)*4;
-      if(d[i]>250&&d[i+1]>250&&d[i+2]>250)continue;
-      d[i]=cl(d[i]*m);d[i+1]=cl(d[i+1]*m);d[i+2]=cl(d[i+2]*m);
-    }
-  c.putImageData(id,0,0);
+  return {
+    el: po,
+    step(text)    { stepEl.textContent = text.toUpperCase(); Log.info('proc.step:', text); append(text); },
+    substep(text) { subEl.textContent  = text;               Log.debug('proc.sub:', text); append('… ' + text); },
+    progress(p)   { barEl.style.display='block'; fillEl.style.width = Math.max(0, Math.min(1, p))*100 + '%'; },
+    remove()      { po.remove(); },
+  };
 }
 
-// ── Controls ──────────────────────────────────────────
-function setType(k){
-  gType=k;
-  document.querySelectorAll('.pill').forEach((b,i)=>{
-    b.className='pill'+(Object.keys(TYPES)[i]===k?' on':'');
+/* finalizeCapturedCanvas:
+   - resamples to target 300 DPI pixel size for gType
+   - runs bg flood-fill (unless skipped) and light normalization
+   - returns JPEG dataURL with proper JFIF DPI bytes */
+async function finalizeCapturedCanvas(srcCv, opts = {}) {
+  const t = TYPES[gType];
+  const tw = Math.round(t.wMM * TARGET_DPI / 25.4);
+  const th = Math.round(t.hMM * TARGET_DPI / 25.4);
+  const outCv = document.createElement('canvas');
+  outCv.width = tw; outCv.height = th;
+  const outCtx = outCv.getContext('2d');
+  outCtx.imageSmoothingEnabled = true;
+  outCtx.imageSmoothingQuality = 'high';
+  outCtx.drawImage(srcCv, 0, 0, tw, th);
+
+  try {
+    if (gBgRemove && gRemoveBg) {
+      const blob = await gRemoveBg(outCv, { model:'small', output:{ format:'image/png', quality:.92 } });
+      const url = URL.createObjectURL(blob);
+      await new Promise((res, rej) => {
+        const img = new Image();
+        img.onload = () => {
+          outCtx.fillStyle = '#fff'; outCtx.fillRect(0,0,tw,th);
+          outCtx.drawImage(img, 0, 0, tw, th); URL.revokeObjectURL(url); res();
+        };
+        img.onerror = rej; img.src = url;
+      });
+    } else if (!opts.skipBgFill) {
+      bgFloodFill(outCtx, tw, th);
+    }
+    normLight(outCtx, tw, th);
+  } catch (e) { console.warn('post-process:', e); }
+
+  const raw = outCv.toDataURL('image/jpeg', .95);
+  return patchJpegDpi(raw, TARGET_DPI);
+}
+
+function bgFloodFill(c, w, h) {
+  const id = c.getImageData(0,0,w,h), d = id.data;
+  let rS=0, gS=0, bS=0, n=0;
+  const add = (x,y) => { const i=(y*w+x)*4; rS+=d[i]; gS+=d[i+1]; bS+=d[i+2]; n++; };
+  for (let x=0; x<w; x++) { add(x,0); add(x,1); add(x,h-1); add(x,h-2); }
+  for (let y=2; y<h-2; y++) { add(0,y); add(1,y); add(w-1,y); add(w-2,y); }
+  const bgR=rS/n, bgG=gS/n, bgB=bS/n, thr=65;
+  const vis = new Uint8Array(w*h), q=[];
+  const enq = (x,y) => {
+    if (x<0||x>=w||y<0||y>=h) return;
+    const idx=y*w+x; if (vis[idx]) return; vis[idx]=1;
+    const i=idx*4, dr=d[i]-bgR, dg=d[i+1]-bgG, db=d[i+2]-bgB;
+    if (Math.sqrt(dr*dr+dg*dg+db*db) < thr) q.push(idx);
+  };
+  for (let x=0; x<w; x++) { enq(x,0); enq(x,h-1); }
+  for (let y=1; y<h-1; y++) { enq(0,y); enq(w-1,y); }
+  while (q.length) {
+    const idx=q.pop(), x=idx%w, y=(idx/w)|0;
+    d[idx*4]=255; d[idx*4+1]=255; d[idx*4+2]=255;
+    enq(x+1,y); enq(x-1,y); enq(x,y+1); enq(x,y-1);
+  }
+  c.putImageData(id, 0, 0);
+}
+
+function normLight(c, w, h) {
+  const id = c.getImageData(0,0,w,h), d = id.data;
+  const fx = w*.18|0, fy = h*.05|0, fw = w*.64|0, fh = h*.78|0;
+  let s=0, n=0;
+  for (let y=fy; y<Math.min(fy+fh,h); y++)
+    for (let x=fx; x<Math.min(fx+fw,w); x++) {
+      const i=(y*w+x)*4;
+      if (d[i]>250 && d[i+1]>250 && d[i+2]>250) continue;
+      s += .299*d[i] + .587*d[i+1] + .114*d[i+2]; n++;
+    }
+  if (!n || !s) return;
+  const m = 158/(s/n); if (Math.abs(m-1) < .06) return;
+  const cl = v => Math.max(0, Math.min(255, v|0));
+  for (let y=fy; y<Math.min(fy+fh,h); y++)
+    for (let x=fx; x<Math.min(fx+fw,w); x++) {
+      const i=(y*w+x)*4;
+      if (d[i]>250 && d[i+1]>250 && d[i+2]>250) continue;
+      d[i]=cl(d[i]*m); d[i+1]=cl(d[i+1]*m); d[i+2]=cl(d[i+2]*m);
+    }
+  c.putImageData(id, 0, 0);
+}
+
+/* ═══════════════════════════════════════════════════════
+   JFIF DPI metadata patch
+═══════════════════════════════════════════════════════ */
+
+function patchJpegDpi(dataUrl, dpi) {
+  const b64 = dataUrl.split(',')[1];
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i=0; i<bin.length; i++) buf[i] = bin.charCodeAt(i);
+  if (buf[0] !== 0xFF || buf[1] !== 0xD8) return dataUrl;
+  if (buf[2] === 0xFF && buf[3] === 0xE0 &&
+      buf[6] === 0x4A && buf[7] === 0x46 && buf[8] === 0x49 && buf[9] === 0x46) {
+    buf[13] = 0x01;
+    buf[14] = (dpi>>8)&0xFF; buf[15] = dpi&0xFF;
+    buf[16] = (dpi>>8)&0xFF; buf[17] = dpi&0xFF;
+    buf[18] = 0; buf[19] = 0;
+    return u8ToDataUrl(buf);
+  }
+  const app0 = new Uint8Array([
+    0xFF,0xE0, 0x00,0x10, 0x4A,0x46,0x49,0x46,0x00, 0x01,0x01, 0x01,
+    (dpi>>8)&0xFF, dpi&0xFF, (dpi>>8)&0xFF, dpi&0xFF, 0x00, 0x00
+  ]);
+  const out = new Uint8Array(buf.length + app0.length);
+  out.set(buf.subarray(0,2), 0);
+  out.set(app0, 2);
+  out.set(buf.subarray(2), 2 + app0.length);
+  return u8ToDataUrl(out);
+}
+
+function u8ToDataUrl(u8) {
+  let s = '';
+  for (let i=0; i<u8.length; i++) s += String.fromCharCode(u8[i]);
+  return 'data:image/jpeg;base64,' + btoa(s);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Preview screen
+═══════════════════════════════════════════════════════ */
+
+function showPreview(url, opts) {
+  vid.style.display='none'; ov.style.display='none'; hintEl.style.display='none';
+  vfEl.querySelectorAll('.prev-wrap,.bstrip').forEach(e => e.remove());
+  const badge = opts.kind === 'ai-ok'  ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
+              : opts.kind === 'ai-fb'  ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
+              : '<div class="prev-badge">✓ Фото готово</div>';
+  vfEl.insertAdjacentHTML('beforeend',
+    `<div class="prev-wrap"><img src="${url}"/>${badge}</div>`);
+  ctrlEl.innerHTML = `
+    <button class="abtn" onclick="retake()">↩ Переснять</button>
+    <div class="paper-toggle">
+      <button class="${gPaper==='10x15'?'on':''}" onclick="setPaper('10x15')">10×15</button>
+      <button class="${gPaper==='a4'?'on':''}"    onclick="setPaper('a4')">A4</button>
+    </div>
+    <button class="abtn"   onclick="printSheet('${url}')">⎙ Лист</button>
+    <button class="abtn p" onclick="dlPhoto('${url}')">↓ JPEG</button>`;
+  document.getElementById('sbar').style.opacity = '.35';
+  gLastPhotoUrl = url;
+}
+let gLastPhotoUrl = null;
+
+function setPaper(p) { gPaper = p; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
+
+/* ═══════════════════════════════════════════════════════
+   Print sheet
+═══════════════════════════════════════════════════════ */
+
+function printSheet(url) {
+  const t = TYPES[gType];
+  const photoW = t.wMM, photoH = t.hMM;
+  let pageW, pageH, cols, rows, pageCss, padding;
+  if (gPaper === 'a4') {
+    pageW = 210; pageH = 297;
+    padding = 8;
+    pageCss = '@page { size: A4 portrait; margin: 0; }';
+    cols = Math.floor((pageW - 2*padding) / (photoW + 4));
+    rows = Math.floor((pageH - 2*padding) / (photoH + 4));
+  } else {
+    pageW = 152; pageH = 102;  // 10×15 landscape
+    padding = 4;
+    pageCss = '@page { size: 152mm 102mm; margin: 0; }';
+    cols = Math.floor((pageW - 2*padding) / (photoW + 3));
+    rows = Math.floor((pageH - 2*padding) / (photoH + 3));
+  }
+  const total = cols * rows;
+
+  const cells = Array.from({ length: total }, () => `
+    <div class="cell">
+      <img src="${url}" alt=""/>
+      <span class="m m-tl"></span><span class="m m-tr"></span>
+      <span class="m m-bl"></span><span class="m m-br"></span>
+    </div>`).join('');
+
+  const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8">
+<title>Печать ${cols}×${rows} (${t.size})</title>
+<style>
+  ${pageCss}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:${pageW}mm;height:${pageH}mm;background:#fff}
+  body{padding:${padding}mm;display:grid;
+       grid-template-columns:repeat(${cols},${photoW}mm);
+       grid-template-rows:repeat(${rows},${photoH}mm);
+       gap:3mm;align-content:start;justify-content:center}
+  .cell{position:relative;width:${photoW}mm;height:${photoH}mm}
+  .cell img{width:${photoW}mm;height:${photoH}mm;display:block;image-rendering:-webkit-optimize-contrast}
+  .m{position:absolute;background:#888}
+  .m-tl,.m-tr{top:-1.5mm;height:.2mm;width:3mm}
+  .m-bl,.m-br{bottom:-1.5mm;height:.2mm;width:3mm}
+  .m-tl{left:-1.5mm}.m-tr{right:-1.5mm}.m-bl{left:-1.5mm}.m-br{right:-1.5mm}
+  .v{position:absolute;background:#888;width:.2mm;height:3mm}
+  @media print { html,body{margin:0;padding:${padding}mm} }
+</style></head><body>${cells}
+<script>
+  window.onload = function() { setTimeout(function(){ window.print(); }, 250); };
+  window.onafterprint = function() { window.close(); };
+<\/script>
+</body></html>`;
+  Platform.print(html);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Single-photo gallery upload
+═══════════════════════════════════════════════════════ */
+
+async function ingestSingleFile(file) {
+  try {
+    Log.info('ingestSingleFile:', file.name||'(no name)', file.size, 'bytes');
+    gCaptured = true;
+    cancelAnimationFrame(gRaf); clearTimeout(gAnalyzeTimer);
+    const po = showProcessing(`${file.name || 'фото'} · ${(file.size/1024).toFixed(0)} КБ`);
+    po.step('Чтение файла');
+    po.progress(0.2);
+    const dataUrl = await fileToDataUrl(file);
+    po.step('Декодирование');
+    po.progress(0.4);
+    const img = await loadImage(dataUrl);
+    po.substep(`${img.width}×${img.height} px`);
+
+    const { aspect } = TYPES[gType];
+    const sw = img.width, sh = img.height;
+    let cW, cH;
+    if (sw/sh > aspect) { cH = sh; cW = (sh*aspect)|0; }
+    else                { cW = sw; cH = (sw/aspect)|0; }
+    const sx = ((sw-cW)/2)|0, sy = ((sh-cH)/2)|0;
+    capCv.width = cW; capCv.height = cH;
+    capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+
+    po.step('Постобработка');
+    po.substep('масштаб до 300 DPI, свет');
+    po.progress(0.7);
+    const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
+    po.progress(1);
+    po.remove();
+    Backup.saveFinal(url, { kind:'single-upload', type: gType, name: file.name });
+    showPreview(url, { kind:'single' });
+  } catch (e) {
+    Log.error('ingestSingleFile failed:', e);
+    toast('Не удалось обработать фото: ' + (e.message||e), 'err');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Child mode — burst + upload, AI compose, validation
+═══════════════════════════════════════════════════════ */
+
+function toggleChildMode() {
+  gMode = gMode === 'child' ? 'single' : 'child';
+  document.getElementById('childPill').classList.toggle('on', gMode==='child');
+  document.getElementById('childTabs').classList.toggle('show', gMode==='child');
+  renderCtrl();
+  updateStatus();
+}
+
+function setChildSrc(s) {
+  gChildSrc = s;
+  document.getElementById('ctab0').classList.toggle('on', s==='burst');
+  document.getElementById('ctab1').classList.toggle('on', s==='upload');
+  renderCtrl();
+}
+
+async function captureBurst() {
+  if (!vid.videoWidth) { toast('Камера не готова', 'warn'); return; }
+  Log.info('captureBurst start');
+  gShots = [];
+  // Pre-roll countdown so the operator can position the child.
+  for (const n of [3, 2, 1]) {
+    setHint(`Начнём через ${n}…`, 'warn');
+    await new Promise(r => setTimeout(r, 700));
+  }
+  let detected = 0;
+  for (let i=0; i<BURST_COUNT; i++) {
+    setHint(`Снимок ${i+1}/${BURST_COUNT} (найдено ${detected})`);
+    const fl = document.createElement('div'); fl.className='flash';
+    vfEl.appendChild(fl); setTimeout(() => fl.remove(), 180);
+    await new Promise(r => setTimeout(r, 200));
+    const shot = grabFrame();
+    const m = await measureFaceMetrics(shot);
+    if (m) detected++;
+    gShots.push({ dataUrl: shot, metrics: m });
+    Log.info(`burst ${i+1}/${BURST_COUNT}: face=${m ? 'yes' : 'no'}`);
+    await new Promise(r => setTimeout(r, 500));
+  }
+  Backup.saveBurst(gShots);
+  finalizeShots();
+}
+
+async function ingestUploads(files) {
+  if (files.length < UPLOAD_MIN) { toast(`Загрузите хотя бы ${UPLOAD_MIN} фото (рекомендуем ${UPLOAD_RECOMMENDED})`, 'warn'); return; }
+  if (files.length > UPLOAD_MAX) { toast(`Слишком много (${files.length}). Максимум ${UPLOAD_MAX}`, 'warn'); return; }
+  const po = showProcessing('читаем фото и ищем лица…');
+  po.step(`Загрузка ${files.length} фото`);
+  gShots = [];
+  try {
+    let i = 0;
+    for (const f of files) {
+      i++;
+      po.substep(`Фото ${i}/${files.length}: ${f.name||'без имени'} (${(f.size/1024).toFixed(0)} КБ)`);
+      po.progress(i / (files.length * 2));
+      const dataUrl = await fileToDataUrl(f);
+      po.substep(`Фото ${i}/${files.length}: ищем лицо`);
+      po.progress((i + .5) / (files.length * 2));
+      const m = await measureFaceMetrics(dataUrl);
+      gShots.push({ dataUrl, metrics: m });
+      Log.info(`upload ${i}/${files.length}: face=${m ? 'yes' : 'no'}`);
+      po.progress((i + 1) / (files.length * 2));
+    }
+  } catch (e) {
+    Log.error('ingestUploads:', e);
+    po.remove();
+    toast('Ошибка при чтении: ' + (e.message||e), 'err');
+    return;
+  }
+  po.remove();
+  Backup.saveBurst(gShots);
+  finalizeShots();
+}
+
+function finalizeShots() {
+  const valid = gShots.filter(s => s.metrics);
+  if (!valid.length) { toast('Лицо ни на одном фото не найдено', 'err'); return; }
+  if (gChildSrc === 'upload' && valid.length < UPLOAD_MIN) {
+    toast(`Валидных фото только ${valid.length}. Добавьте ещё.`, 'warn');
+  }
+  gRefMetrics = pickBestMetrics(valid);
+  showBurstStrip();
+}
+
+function pickBestMetrics(shots) {
+  let best = shots[0].metrics;
+  let bestScore = Math.abs(best.yaw) + Math.abs(best.roll);
+  for (const s of shots) {
+    if (!s.metrics) continue;
+    const score = Math.abs(s.metrics.yaw) + Math.abs(s.metrics.roll);
+    if (score < bestScore) { best = s.metrics; bestScore = score; }
+  }
+  return { ...best };
+}
+
+function grabFrame() {
+  const c = document.createElement('canvas');
+  c.width = vid.videoWidth; c.height = vid.videoHeight;
+  const x = c.getContext('2d');
+  if (gFacing === 'user') { x.save(); x.translate(c.width, 0); x.scale(-1, 1); x.drawImage(vid, 0, 0); x.restore(); }
+  else x.drawImage(vid, 0, 0);
+  return c.toDataURL('image/jpeg', .92);
+}
+
+/* MediaPipe Face Detection on a static image — returns
+   normalized metrics: { iod, e2c, n2m, yaw, roll } or null.
+   Calls are serialized so the live handler can be restored cleanly. */
+let _fdQueue = Promise.resolve();
+async function measureFaceMetrics(dataUrl) {
+  if (!gModelReady || !window._fd) return null;
+  let img;
+  try { img = await loadImage(dataUrl); } catch (e) { Log.warn('measureFaceMetrics loadImage:', e); return null; }
+  const run = () => new Promise(res => {
+    const settle = (v) => {
+      // restore live handler before resolving so the next live send works
+      try { window._fd.onResults(_fdLiveHandler || (() => {})); } catch(e) {}
+      res(v);
+    };
+    const once = (r) => {
+      if (!r.detections || !r.detections.length) return settle(null);
+      const det = r.detections[0], bb = det.boundingBox, lm = det.landmarks;
+      if (!lm || lm.length < 4) return settle(null);
+      const re=lm[0], le=lm[1], nose=lm[2], mouth=lm[3];
+      const iod = Math.abs(le.x - re.x);
+      const eyeMidY = (re.y + le.y)/2;
+      const e2c = (bb.yCenter + bb.height/2) - eyeMidY;
+      const n2m = mouth.y - nose.y;
+      const yaw = (nose.x - (re.x + le.x)/2) / bb.width;
+      const roll = Math.atan2(le.y-re.y, le.x-re.x) * 180/Math.PI;
+      settle({ iod, e2c, n2m, yaw, roll });
+    };
+    try { window._fd.onResults(once); } catch (e) { return settle(null); }
+    const timeout = setTimeout(() => settle(null), 3000);
+    window._fd.send({ image: img })
+      .then(() => clearTimeout(timeout))
+      .catch((e) => { clearTimeout(timeout); Log.warn('fd.send static:', e); settle(null); });
   });
-  const t=TYPES[k];
-  document.getElementById('subdesc').textContent=`${t.size} · ${t.desc}`;
+  // serialize
+  const p = _fdQueue.then(run);
+  _fdQueue = p.catch(() => {});
+  return p;
+}
+
+function loadImage(src) {
+  return new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = rej;
+    img.src = src;
+  });
+}
+
+function fileToDataUrl(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(f);
+  });
+}
+
+function showBurstStrip() {
+  vfEl.querySelectorAll('.bstrip').forEach(e => e.remove());
+  const valid = gShots.filter(s => s.metrics).length;
+  const strip = document.createElement('div');
+  strip.className = 'bstrip';
+  strip.innerHTML = `
+    <div class="bstrip-h">
+      <span>Кадров: ${valid} из ${gShots.length}</span>
+      <button class="abtn" style="flex:0 0 auto;padding:4px 10px" onclick="closeBurstStrip()">✕</button>
+    </div>
+    <div class="bstrip-grid">
+      ${gShots.map((s, i) => `
+        <div class="bthumb ${s.metrics?'ok':'bad'}" onclick="useShot(${i})">
+          <img src="${s.dataUrl}" alt=""/>
+          ${s.metrics ? '' : '<span class="bthumb-x">×</span>'}
+        </div>`).join('')}
+    </div>
+    <div class="bstrip-act">
+      <button class="abtn p" onclick="composeAi()">🎨 Объединить через AI</button>
+    </div>`;
+  vfEl.appendChild(strip);
+}
+
+function closeBurstStrip() { vfEl.querySelectorAll('.bstrip').forEach(e => e.remove()); }
+
+async function useShot(idx) {
+  const s = gShots[idx]; if (!s) return;
+  closeBurstStrip();
+  Log.info(`useShot ${idx}`);
+  const po = showProcessing('кадр ' + (idx+1));
+  po.step('Обработка выбранного кадра');
+  try {
+    po.substep('декодирование'); po.progress(0.2);
+    const img = await loadImage(s.dataUrl);
+    const { aspect } = TYPES[gType];
+    let cW, cH;
+    if (img.width/img.height > aspect) { cH = img.height; cW = (img.height*aspect)|0; }
+    else                                { cW = img.width;  cH = (img.width/aspect)|0; }
+    const sx = ((img.width-cW)/2)|0, sy = ((img.height-cH)/2)|0;
+    capCv.width = cW; capCv.height = cH;
+    capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+    po.substep('пост-обработка'); po.progress(0.6);
+    const url = await finalizeCapturedCanvas(capCv, { skipBgFill: false });
+    po.progress(1);
+    po.remove();
+    Backup.saveFinal(url, { kind:'manual-pick', type: gType, idx });
+    showPreview(url, { kind:'single' });
+  } catch (e) {
+    Log.error('useShot:', e);
+    po.remove();
+    toast('Ошибка: ' + (e.message||e), 'err');
+  }
+}
+
+async function composeAi() {
+  gAi = makeAiBackend();
+  if (!gAi.configured) {
+    toast('Введите API-ключ в настройках ⚙', 'warn');
+    openSettings();
+    return;
+  }
+  const valid = gShots.filter(s => s.metrics);
+  if (!valid.length) { toast('Нет валидных кадров для AI', 'err'); return; }
+
+  closeBurstStrip();
+  const po = showProcessing(`${valid.length} фото для AI`);
+  po.step('AI композиция');
+  po.substep(`найдено ${valid.length} валидных кадров из ${gShots.length}`);
+  Log.info(`composeAi start: valid=${valid.length}/${gShots.length} src=${gChildSrc}`);
+
+  let aiUrl;
+  try {
+    const bestIdx = valid.indexOf(valid.reduce((a, b) =>
+      (Math.abs(a.metrics.yaw)+Math.abs(a.metrics.roll) < Math.abs(b.metrics.yaw)+Math.abs(b.metrics.roll) ? a : b)
+    ));
+    po.step('Шаг 1/4: возраст референса');
+    po.substep('AI читает фронтальный кадр…');
+    po.progress(0.1);
+    try {
+      gRefAge = await gAi.estimateAge(valid[bestIdx].dataUrl);
+      Log.info('refAge =', gRefAge);
+      po.substep(gRefAge != null ? `референсный возраст ≈ ${gRefAge}` : 'возраст не определён (пропускаем)');
+    } catch (e) { Log.warn('estimateAge ref failed:', e.message); gRefAge = null; }
+
+    po.step(`Шаг 2/4: AI композирует (${valid.length} кадров)`);
+    po.substep('отправляем в Gemini, ожидаем результат… до 30 сек');
+    po.progress(0.25);
+    const t0 = Date.now();
+    aiUrl = await gAi.compose(valid, gRefMetrics, gChildSrc);
+    Log.info(`AI compose done in ${((Date.now()-t0)/1000).toFixed(1)}s`);
+    po.progress(0.6);
+  } catch (e) {
+    Log.error('composeAi failed:', e);
+    po.remove();
+    toast('AI: ' + (e.message||e) + '. Используйте лучший кадр вручную.', 'err');
+    showBurstStrip();
+    return;
+  }
+
+  po.step('Шаг 3/4: проверка пропорций');
+  po.substep('MediaPipe измеряет геометрию лица…');
+  po.progress(0.7);
+  const aiMetrics = await measureFaceMetrics(aiUrl);
+  const tol = TOLERANCE[gChildSrc] || 0.05;
+  let okMetrics = true, badReason = '';
+  if (!aiMetrics) { okMetrics = false; badReason = 'лицо на AI-результате не найдено'; }
+  else if (gRefMetrics) {
+    const dev = k => Math.abs(aiMetrics[k] - gRefMetrics[k]) / Math.max(Math.abs(gRefMetrics[k]), 1e-6);
+    for (const k of ['iod','e2c','n2m']) {
+      const d = dev(k);
+      Log.info(`metric ${k}: ref=${gRefMetrics[k].toFixed(3)} ai=${aiMetrics[k].toFixed(3)} dev=${(d*100).toFixed(1)}%`);
+      po.substep(`${k}: отклонение ${(d*100).toFixed(1)}% (макс ${(tol*100).toFixed(0)}%)`);
+      if (d > tol) { okMetrics = false; badReason = `${k} отклонилось на ${(d*100).toFixed(1)}% (макс ${(tol*100).toFixed(0)}%)`; break; }
+    }
+  }
+  po.progress(0.85);
+
+  let okAge = true;
+  if (okMetrics && gRefAge != null) {
+    po.step('Шаг 4/4: проверка возраста');
+    po.substep('AI оценивает возраст на результате…');
+    po.progress(0.9);
+    try {
+      const aiAge = await gAi.estimateAge(aiUrl);
+      Log.info(`age check: ref=${gRefAge} ai=${aiAge}`);
+      if (aiAge != null) {
+        po.substep(`возраст: исходный ≈ ${gRefAge}, AI ≈ ${aiAge}`);
+        if (Math.abs(aiAge - gRefAge) > AGE_TOLERANCE_YEARS) {
+          okAge = false; badReason = `AI оценил возраст ${aiAge}, исходный ${gRefAge} (отклонение > ${AGE_TOLERANCE_YEARS} лет)`;
+        }
+      }
+    } catch(e) { Log.warn('estimateAge ai failed:', e.message); }
+  }
+  po.progress(1);
+
+  po.remove();
+
+  if (okMetrics && okAge) {
+    const img = await loadImage(aiUrl);
+    const t = TYPES[gType];
+    const sw = img.width, sh = img.height;
+    let cW, cH;
+    if (sw/sh > t.aspect) { cH = sh; cW = (sh*t.aspect)|0; }
+    else                  { cW = sw; cH = (sw/t.aspect)|0; }
+    const sx = ((sw-cW)/2)|0, sy = ((sh-cH)/2)|0;
+    capCv.width = cW; capCv.height = cH;
+    capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+    const finalUrl = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
+    Log.info('composeAi: OK, saved as final');
+    Backup.saveFinal(finalUrl, { kind:'ai-ok', src: gChildSrc, type: gType, refAge: gRefAge });
+    showPreview(finalUrl, { kind:'ai-ok', src: gChildSrc==='upload' ? 'загрузка' : 'серия' });
+    return;
+  }
+
+  Log.warn('composeAi: fallback to best frame —', badReason);
+  toast(`AI исказил: ${badReason}. Используем лучший кадр.`, 'warn');
+  const bestIdx = valid.indexOf(valid.reduce((a, b) =>
+    (Math.abs(a.metrics.yaw)+Math.abs(a.metrics.roll) < Math.abs(b.metrics.yaw)+Math.abs(b.metrics.roll) ? a : b)
+  ));
+  const img = await loadImage(valid[bestIdx].dataUrl);
+  const { aspect } = TYPES[gType];
+  let cW, cH;
+  if (img.width/img.height > aspect) { cH = img.height; cW = (img.height*aspect)|0; }
+  else                                { cW = img.width;  cH = (img.width/aspect)|0; }
+  const sx = ((img.width-cW)/2)|0, sy = ((img.height-cH)/2)|0;
+  capCv.width = cW; capCv.height = cH;
+  capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: false });
+  Backup.saveFinal(url, { kind:'ai-fallback', reason: badReason, type: gType });
+  showPreview(url, { kind:'ai-fb' });
+}
+
+/* ═══════════════════════════════════════════════════════
+   Controls render — varies by mode/src
+═══════════════════════════════════════════════════════ */
+
+function renderCtrl() {
+  if (gMode === 'child') {
+    if (gChildSrc === 'burst') {
+      ctrlEl.innerHTML = `
+        <button class="icobtn" onclick="flipCam()" title="Поменять камеру">⇄</button>
+        <button class="cbtn child" id="capBtn" onclick="doCapture()"><div class="ci"></div><span class="cn">5×</span></button>
+        ${gPortraitCapable ? `<button class="icobtn ${gPortrait?'on':''}" onclick="togglePortrait()" title="Портрет">📷⊕</button>` : `<button class="icobtn" onclick="toggleBg()" id="bgBtn" title="AI фон">🪄</button>`}
+      `;
+    } else {
+      ctrlEl.innerHTML = `
+        <button class="abtn" onclick="fileMulti.click()">📁 Выбрать ${UPLOAD_MIN}–${UPLOAD_MAX} фото</button>
+        <span class="upload-help">рекомендуем ${UPLOAD_RECOMMENDED}</span>`;
+    }
+  } else {
+    ctrlEl.innerHTML = `
+      <button class="icobtn" onclick="flipCam()" title="Поменять камеру">⇄</button>
+      <button class="icobtn" onclick="fileSingle.click()" title="Из галереи">📁</button>
+      <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
+      ${gPortraitCapable ? `<button class="icobtn ${gPortrait?'on':''}" onclick="togglePortrait()" title="Портрет">📷⊕</button>` : ''}
+      <button class="icobtn ${gBgRemove?'on':''}" id="bgBtn" onclick="toggleBg()" title="AI фон">🪄</button>`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Type, camera-flip, retake, background, settings, toast
+═══════════════════════════════════════════════════════ */
+
+function setType(k) {
+  gType = k;
+  if (gMode === 'child' && k !== 'passport') { /* keep child mode independent */ }
+  document.querySelectorAll('.pills .pill').forEach((b, i) => {
+    if (i < 3) b.classList.toggle('on', Object.keys(TYPES)[i] === k);
+  });
+  document.getElementById('subdesc').textContent = `${TYPES[k].size} · ${TYPES[k].desc}`;
   renderReqs();
 }
-function flipCam(){gFacing=gFacing==='user'?'environment':'user';retake();}
-function toggleBg(){
-  gBgRemove=!gBgRemove;
-  document.getElementById('bgBtn').className='icobtn'+(gBgRemove?' on':'');
-  if(gBgRemove&&!gBgLoaded){
+
+function flipCam() {
+  if (!Platform.secureContext()) return;
+  gFacing = gFacing === 'user' ? 'environment' : 'user';
+  retake();
+}
+
+function toggleBg() {
+  gBgRemove = !gBgRemove;
+  renderCtrl();
+  if (gBgRemove && !gBgLoaded) {
     import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/dist/browser/index.mjs')
-      .then(m=>{gRemoveBg=m.removeBackground;gBgLoaded=true;})
-      .catch(()=>{gBgRemove=false;document.getElementById('bgBtn').className='icobtn';});
+      .then(m => { gRemoveBg = m.removeBackground; gBgLoaded = true; })
+      .catch(e => { gBgRemove = false; renderCtrl(); toast('Удаление фона не загрузилось: ' + (e.message||e), 'warn'); });
   }
 }
-function retake(){
-  gCaptured=false;
-  vid.style.display='';ov.style.display='';hintEl.style.display='';
+
+function retake() {
+  gCaptured = false;
+  vid.style.display=''; ov.style.display=''; hintEl.style.display='';
   vfEl.querySelector('.prev-wrap')?.remove();
-  vfEl.querySelectorAll('.cam-err').forEach(e=>e.remove());
-  document.getElementById('ctrl').innerHTML=`
-    <button class="icobtn" onclick="flipCam()">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20 7h-9"/><path d="M14 17H5"/>
-        <polyline points="17 4 20 7 17 10"/><polyline points="8 14 5 17 8 20"/>
-      </svg>
-    </button>
-    <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
-    <button class="icobtn${gBgRemove?' on':''}" id="bgBtn" onclick="toggleBg()">🪄</button>`;
+  vfEl.querySelectorAll('.cam-err').forEach(e => e.remove());
+  vfEl.querySelectorAll('.bstrip').forEach(e => e.remove());
   document.getElementById('sbar').style.opacity='1';
+  renderCtrl();
   startCamera();
 }
-function dlPhoto(url){
-  const a=document.createElement('a');a.href=url;a.download=`doc_photo_${Date.now()}.jpg`;a.click();
+
+function dlPhoto(url) {
+  const t = TYPES[gType];
+  const name = `doc_photo_${gType}_${t.wMM}x${t.hMM}mm_${Date.now()}.jpg`;
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click();
 }
-function renderReqs(){
-  const t=TYPES[gType];
-  document.getElementById('rg').innerHTML=
-    REQS.map(([k,v])=>`<div class="ri"><span class="rk">${k}</span><span class="rv">${v||t.size}</span></div>`).join('');
+
+function renderReqs() {
+  const t = TYPES[gType];
+  const headMmMin = (t.hMM * t.headPctMin).toFixed(0);
+  const headMmMax = (t.hMM * t.headPctMax).toFixed(0);
+  const reqs = [
+    ['Размер', t.size],
+    ['DPI', '300 (для печати)'],
+    ['Высота головы', `${headMmMin}–${headMmMax} мм`],
+    ['Линия глаз', `${(t.eyeFromBottomMin*t.hMM).toFixed(0)}–${(t.eyeFromBottomMax*t.hMM).toFixed(0)} мм от низа`],
+    ['Фон', 'белый / светло-серый'],
+    ['Взгляд', 'прямо в объектив'],
+    ['Выражение', 'нейтральное'],
+    ['Качество', 'без теней, резкое'],
+  ];
+  document.getElementById('rg').innerHTML =
+    reqs.map(([k, v]) => `<div class="ri"><span class="rk">${k}</span><span class="rv">${v}</span></div>`).join('');
 }
+
+/* ═══════════════════════════════════════════════════════
+   Settings modal
+═══════════════════════════════════════════════════════ */
+
+function openSettings() {
+  closeModal();
+  const backend = Platform.storage.get('aiBackend') || 'gemini';
+  const key = Platform.storage.get('geminiKey') || '';
+  const tgUrl = Platform.storage.get('tgBotUrl') || '';
+  const ads = Platform.storage.get('ads') === '1';
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg';
+  bg.innerHTML = `
+    <div class="modal" onclick="event.stopPropagation()">
+      <h3>⚙ НАСТРОЙКИ</h3>
+      <label>AI-бэкенд
+        <select id="setBackend">
+          <option value="gemini" ${backend==='gemini'?'selected':''}>Gemini напрямую (Nano Banana)</option>
+          <option value="telegram" ${backend==='telegram'?'selected':''}>Telegram-бот (в разработке)</option>
+        </select>
+      </label>
+      <div id="setGemini" ${backend!=='gemini'?'hidden':''}>
+        <label>API-ключ Google AI Studio
+          <input type="password" id="setKey" value="${escapeAttr(key)}" placeholder="AIza..."/>
+        </label>
+        <small>Получить ключ: <a href="https://aistudio.google.com/apikey" target="_blank" style="color:#60a5fa">aistudio.google.com/apikey</a><br>
+        Ключ сохраняется ТОЛЬКО в этом браузере (localStorage). Не публикуйте копию приложения вместе со своим ключом — его украдут.</small>
+      </div>
+      <div id="setTg" ${backend!=='telegram'?'hidden':''}>
+        <label>URL Telegram-бота (proxy endpoint)
+          <input type="text" id="setTgUrl" value="${escapeAttr(tgUrl)}" placeholder="https://your-bot.example.com/compose"/>
+        </label>
+        <small>Архитектурный задел: на сервере крутится бот, держит ключ Gemini в ENV. Запросы из браузера идут к боту, ответ — изображение. Реализация пока заглушка.</small>
+      </div>
+      <label style="flex-direction:row;align-items:center;gap:8px">
+        <input type="checkbox" id="setAds" ${ads?'checked':''}/> Показывать места под рекламу
+      </label>
+      <small>Реклама обычно скрыта в браузерной версии. На Android-сборке отключается автоматически.</small>
+
+      <h3 style="margin-top:6px">🗂 Бэкапы и логи</h3>
+      <div id="backupList" class="upload-help" style="text-align:left;padding:0">загружаем…</div>
+      <div class="modal-row">
+        <button class="abtn" onclick="Log.export(); toast('Лог сохранён', 'ok')">⤓ Экспорт лога</button>
+        <button class="abtn" onclick="if(confirm('Очистить все бэкапы и логи?')) { Backup.clear(); Log.clear(); toast('Очищено','ok'); closeModal(); }">⊘ Очистить</button>
+      </div>
+
+      <div class="modal-row">
+        <button class="abtn" onclick="closeModal()">Отмена</button>
+        <button class="abtn p" onclick="saveSettings()">Сохранить</button>
+      </div>
+    </div>`;
+  bg.onclick = closeModal;
+  bg.querySelector('#setBackend').onchange = e => {
+    bg.querySelector('#setGemini').hidden = e.target.value !== 'gemini';
+    bg.querySelector('#setTg').hidden     = e.target.value !== 'telegram';
+  };
+  document.body.appendChild(bg);
+  // Populate backup list async
+  Backup.listFinals().then(list => {
+    const el = bg.querySelector('#backupList');
+    if (!el) return;
+    if (!list.length) { el.innerHTML = '<i>нет сохранённых фото</i>'; return; }
+    el.innerHTML = list.map(b => {
+      const date = new Date(b.t).toLocaleString();
+      const kind = b.meta?.kind || '?';
+      return `<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(232,213,163,.06)">
+        <img src="${b.url}" style="width:24px;height:auto;border:1px solid rgba(232,213,163,.2)"/>
+        <span style="flex:1;font-size:9px">${date} · ${kind}</span>
+        <button class="abtn" style="padding:3px 6px;font-size:9px;flex:0 0 auto" onclick="restoreBackup('${b.id}')">↺</button>
+      </div>`;
+    }).join('');
+  });
+}
+
+async function restoreBackup(id) {
+  const all = await Backup.listFinals();
+  const item = all.find(b => b.id === id);
+  if (!item) { toast('Не найдено', 'err'); return; }
+  closeModal();
+  Log.info('Restore backup:', id);
+  showPreview(item.url, { kind:'single' });
+}
+
+function saveSettings() {
+  const bg = document.querySelector('.modal-bg');
+  if (!bg) return;
+  const backend = bg.querySelector('#setBackend').value;
+  Platform.storage.set('aiBackend', backend);
+  if (backend === 'gemini') Platform.storage.set('geminiKey', bg.querySelector('#setKey').value.trim());
+  else                      Platform.storage.set('tgBotUrl',  bg.querySelector('#setTgUrl').value.trim());
+  Platform.storage.set('ads', bg.querySelector('#setAds').checked ? '1' : '0');
+  closeModal();
+  gAi = makeAiBackend();
+  initAdSlots();
+  toast('Настройки сохранены', 'ok');
+}
+
+function closeModal() {
+  document.querySelectorAll('.modal-bg').forEach(e => e.remove());
+}
+
+function escapeAttr(s) { return String(s).replace(/[<>"&]/g, c => ({ '<':'&lt;', '>':'&gt;', '"':'&quot;', '&':'&amp;' }[c])); }
+
+/* ═══════════════════════════════════════════════════════
+   Toast
+═══════════════════════════════════════════════════════ */
+
+let _toastTimer = null;
+function toast(msg, kind) {
+  document.querySelectorAll('.toast').forEach(e => e.remove());
+  const t = document.createElement('div');
+  t.className = 'toast' + (kind ? ' '+kind : '');
+  t.textContent = msg;
+  document.body.appendChild(t);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.remove(), 4500);
+}
+
 </script>
 </body>
 </html>
