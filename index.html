@@ -512,6 +512,11 @@ class GeminiDirectBackend {
     const prompt =
       'OUTPUT: return ONE edited image (not text). ' +
       'Edit this photo for use as a Russian ID document (35×45 mm passport photo). ' +
+      'OUTPUT FRAMING (CRITICAL — fix even if it means re-framing): ' +
+      '- Head occupies 70–80% of the frame HEIGHT. Resize/reframe if needed (keep 35:45 aspect). ' +
+      '- Eyes positioned at 60–65% from the BOTTOM of the frame. ' +
+      '- LEAVE 3–5% white margin above the top of the hair (crown). NEVER crop hair at the top edge. ' +
+      '- Show head, neck and tops of shoulders. ' +
       'TASKS: ' +
       '1) Replace the background ENTIRELY with a uniform plain white (#FFFFFF) or very light gray (#F0F0F0). ' +
       '   Remove every trace of the original surroundings — walls, car interior, seat belts, furniture, other people, shadows on the background. ' +
@@ -521,16 +526,19 @@ class GeminiDirectBackend {
       '   no arm visible, no stretched neck. Reconstruct the missing side of the torso plausibly with the SAME clothing. ' +
       '4) If the mouth is open (smiling, talking, gasping), close it to a relaxed neutral expression: ' +
       '   lips gently touching, no teeth visible, no smile. Preserve the natural shape and color of the lips. ' +
-      '5) Apply subtle, photographic skin retouch: even out skin tone unevenness, soften (do NOT remove) ' +
-      '   under-eye circles, soften deep harsh wrinkles slightly. Keep pores and natural skin texture. ' +
-      '   ALWAYS PRESERVE distinctive features: beard, eyebrows, moles, freckles, birthmarks, scars, glasses, piercings. ' +
-      '   Result must look like a real un-airbrushed photograph, not a 3D render. ' +
+      '5) Apply professional passport-studio skin retouch (visible, not subtle): ' +
+      '   - Reduce under-eye darkness/bags by approximately 50%. ' +
+      '   - Reduce visibility of fine wrinkles around eyes and forehead by approximately 30%. ' +
+      '   - Even out skin tone unevenness: remove blotchy redness, smooth blemishes, fade temporary spots. ' +
+      '   - Keep visible skin texture and pores — NO airbrushed / plastic / 3D look. ' +
+      '   ALWAYS PRESERVE these distinctive features unchanged: beard, eyebrows, MOLES, FRECKLES, birthmarks, ' +
+      '   scars, glasses, piercings, hairstyle. Result must read as "the same person, looking healthy and rested". ' +
       'STRICT — DO NOT CHANGE: ' +
-      'a) The person\'s face — keep eye spacing, nose length, chin shape, head proportions and skin tone EXACTLY as in the input (within 5%). ' +
-      'b) Hair (color, style, length, fly-aways). Beard, eyebrows, moles, freckles, glasses. ' +
+      'a) The person\'s face geometry — keep eye spacing, nose length, chin shape, head proportions and skin tone. ' +
+      'b) Hair color, style, length. ' +
       'c) Clothing color, pattern and material — only the cut at the shoulders may be adjusted to make them level. ' +
       'd) Apparent age of the person. ' +
-      'Output: same aspect ratio as input, photographic realism, no cartoon/painting style.';
+      'Output: photographic realism (real camera, not CGI). No cartoon/painting style.';
     // Specialised image-generation model; native image output.
     // Try preview name first (older, often more permissive), fall back to prod name if 404.
     const candidateModels = ['gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image'];
@@ -1300,6 +1308,7 @@ function u8ToDataUrl(u8) {
 function showPreview(url, opts) {
   vid.style.display='none'; ov.style.display='none'; hintEl.style.display='none';
   vfEl.querySelectorAll('.prev-wrap,.bstrip').forEach(e => e.remove());
+  const isAiResult = opts.kind === 'ai-bg' || opts.kind === 'ai-bg-warn' || opts.kind === 'ai-ok';
   const badge = opts.kind === 'ai-ok'     ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
               : opts.kind === 'ai-fb'     ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
               : opts.kind === 'ai-bg'     ? '<div class="prev-badge">✓ AI фон заменён</div>'
@@ -1307,9 +1316,12 @@ function showPreview(url, opts) {
               : '<div class="prev-badge">✓ Фото готово</div>';
   vfEl.insertAdjacentHTML('beforeend',
     `<div class="prev-wrap"><img src="${url}"/>${badge}</div>`);
+  // Если уже есть AI-результат, основная кнопка — «🔁 AI ещё попытка» (re-run на исходнике).
+  // Иначе — «🪄 AI фон» (первая попытка).
+  const aiBtnLabel = isAiResult ? '🔁 AI ещё попытка' : '🪄 AI фон';
   ctrlEl.innerHTML = `
     <button class="abtn" onclick="retake()">↩ Переснять</button>
-    <button class="abtn" onclick="aiCleanBg()" title="Заменить фон через Gemini">🪄 AI фон</button>
+    <button class="abtn" onclick="aiCleanBg()" title="Запросить новый вариант AI">${aiBtnLabel}</button>
     <div class="paper-toggle">
       <button class="${gPaper==='10x15'?'on':''}" onclick="setPaper('10x15')">10×15</button>
       <button class="${gPaper==='a4'?'on':''}"    onclick="setPaper('a4')">A4</button>
@@ -1318,8 +1330,9 @@ function showPreview(url, opts) {
     <button class="abtn p" onclick="dlPhoto('${gLastPhotoUrl}')">↓ JPEG</button>`;
   document.getElementById('sbar').style.opacity = '.35';
   gLastPhotoUrl = url;
-  if (opts.kind === 'single' || opts.kind === 'ai-bg') gLastSourceUrl = gLastSourceUrl || url;
-  if (opts.kind === 'single') gLastSourceUrl = url;  // обновляем источник при новой съёмке
+  // ВАЖНО: при показе AI-результата НЕ перезаписываем gLastSourceUrl —
+  // следующая попытка AI должна работать с оригиналом, а не с уже обработанной картинкой.
+  if (opts.kind === 'single') gLastSourceUrl = url;
 }
 let gLastPhotoUrl = null;
 let gLastSourceUrl = null;  // фото ДО AI фона — для повторной попытки и сравнения
@@ -1380,17 +1393,24 @@ async function aiCleanBg() {
   po.substep('MediaPipe сверяет геометрию лица');
   po.progress(0.65);
   const aiMetrics = await measureFaceMetrics(aiUrl);
-  let okPerson = true, badPerson = '';
-  if (!aiMetrics) { okPerson = false; badPerson = 'на результате не найдено лицо'; }
-  else {
-    const dev = k => Math.abs(aiMetrics[k] - refMetrics[k]) / Math.max(Math.abs(refMetrics[k]), 1e-6);
+  // Считаем максимальное отклонение по всем трём метрикам, не выходим из цикла на первом
+  let maxDevPct = 0, maxDevK = '';
+  if (!aiMetrics) {
+    maxDevPct = 1; maxDevK = 'no-face';
+  } else {
     for (const k of ['iod','e2c','n2m']) {
-      const d = dev(k);
+      const d = Math.abs(aiMetrics[k] - refMetrics[k]) / Math.max(Math.abs(refMetrics[k]), 1e-6);
       Log.info(`bg-check ${k}: ref=${refMetrics[k].toFixed(3)} ai=${aiMetrics[k].toFixed(3)} dev=${(d*100).toFixed(1)}%`);
-      po.substep(`${k}: отклонение ${(d*100).toFixed(1)}% (макс 5%)`);
-      if (d > 0.05) { okPerson = false; badPerson = `${k} отклонилось на ${(d*100).toFixed(1)}% (макс 5%)`; break; }
+      if (d > maxDevPct) { maxDevPct = d; maxDevK = k; }
     }
+    po.substep(`лицо: макс отклонение ${(maxDevPct*100).toFixed(1)}% (${maxDevK})`);
   }
+  // Жёсткий лимит — выше этого AI уже подменил человека.
+  // Мягкий лимит — ретушь/закрытие рта/выравнивание плеч могут естественно сдвинуть метрики.
+  const HARD_FACE_LIMIT = 0.12;  // 12%
+  const SOFT_FACE_LIMIT = 0.05;  // 5%
+  const personHardFail = maxDevPct > HARD_FACE_LIMIT || !aiMetrics;
+  const personSoftWarn = !personHardFail && maxDevPct > SOFT_FACE_LIMIT;
   po.progress(0.8);
 
   po.step('4/4: белый ли фон?');
@@ -1402,16 +1422,14 @@ async function aiCleanBg() {
   po.progress(1);
   po.remove();
 
-  // Person check — жёсткий стоп: AI исказил лицо, фото нельзя использовать
-  if (!okPerson) {
-    toast(`AI исказил лицо: ${badPerson}. Оставляем оригинал.`, 'warn');
-    Log.warn('aiCleanBg rejected — person check:', badPerson);
+  // Hard reject — лицо явно подменено
+  if (personHardFail) {
+    const reason = aiMetrics ? `${maxDevK} ${(maxDevPct*100).toFixed(1)}% > ${(HARD_FACE_LIMIT*100)}%` : 'лицо не найдено';
+    toast(`AI слишком сильно изменил лицо: ${reason}. Попробуйте «🔁 AI ещё» — другой результат.`, 'err');
+    Log.warn('aiCleanBg HARD reject — person check:', reason);
     return;
   }
-  // Bg check — мягкое предупреждение: показываем AI-результат, но честно сигналим,
-  // что фон не идеально однородный. Пользователь решает.
-  const maxDev = Math.max(...['iod','e2c','n2m']
-    .map(k => Math.abs(aiMetrics[k]-refMetrics[k])/refMetrics[k]*100)).toFixed(1);
+  const maxDev = (maxDevPct*100).toFixed(1);
 
   const img = await loadImage(aiUrl);
   const t = TYPES[gType];
@@ -1428,22 +1446,26 @@ async function aiCleanBg() {
   const gost = await checkGostCompliance(finalUrl);
   Log.info('GOST check:', gost);
 
-  Backup.saveFinal(finalUrl, { kind: bgCheck.ok ? 'ai-bg' : 'ai-bg-warn', type: gType, bgCheck, gost });
+  Backup.saveFinal(finalUrl, { kind: (bgCheck.ok && gost.ok && !personSoftWarn) ? 'ai-bg' : 'ai-bg-warn', type: gType, bgCheck, gost, personSoftWarn, maxDevPct });
 
   const gostBadge = gost.ok
     ? `ГОСТ ✓`
     : `ГОСТ: ${gost.issues.length} замечание(й)`;
+  const personBadge = personSoftWarn
+    ? `лицо ±${maxDev}% (ретушь)`
+    : `лицо ±${maxDev}%`;
 
-  if (bgCheck.ok && gost.ok) {
-    toast(`AI фон: OK. Лицо ±${maxDev}%, фон ${bgCheck.meanL.toFixed(0)}/255, ${gostBadge}`, 'ok');
-    showPreview(finalUrl, { kind:'ai-bg', gost });
+  if (bgCheck.ok && gost.ok && !personSoftWarn) {
+    toast(`AI фон: OK. ${personBadge}, фон ${bgCheck.meanL.toFixed(0)}/255, ${gostBadge}`, 'ok');
+    showPreview(finalUrl, { kind:'ai-bg', gost, maxDevPct });
   } else {
     const issues = [];
-    if (!bgCheck.ok) issues.push(`фон: ${bgCheck.reason}`);
-    if (!gost.ok)    issues.push(...gost.issues);
-    toast(`AI фон с замечаниями: ${issues.join('; ')}. Лицо ±${maxDev}% — ок. Посмотрите.`, 'warn');
+    if (personSoftWarn) issues.push(`лицо изменилось на ${maxDev}% (ретушь/закрытие рта)`);
+    if (!bgCheck.ok)    issues.push(`фон: ${bgCheck.reason}`);
+    if (!gost.ok)       issues.push(...gost.issues);
+    toast(`AI фон с замечаниями: ${issues.join('; ')}. Нажмите «🔁 AI ещё» для другой попытки.`, 'warn');
     Log.warn('aiCleanBg soft-fail:', issues.join('; '));
-    showPreview(finalUrl, { kind:'ai-bg-warn', gost });
+    showPreview(finalUrl, { kind:'ai-bg-warn', gost, maxDevPct });
   }
 }
 
