@@ -402,6 +402,18 @@ const Backup = (() => {
    Telegram bot proxy is stubbed for future implementation.
 ═══════════════════════════════════════════════════════ */
 
+// Gemini API возвращает inlineData/mimeType (camelCase) на части эндпоинтов
+// и inline_data/mime_type (snake_case) на других. Принимаем оба варианта.
+function pickInlineData(j) {
+  const parts = j?.candidates?.[0]?.content?.parts;
+  if (!parts) return null;
+  for (const p of parts) {
+    const d = p.inline_data || p.inlineData;
+    if (d && d.data) return d;
+  }
+  return null;
+}
+
 class GeminiDirectBackend {
   constructor(key) { this.key = key; }
   get configured() { return !!this.key; }
@@ -490,9 +502,9 @@ class GeminiDirectBackend {
     }
     const j = await r.json();
     try { Log.info('compose raw response:', JSON.stringify(j).slice(0, 2000)); } catch(_) {}
-    const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
+    const out = pickInlineData(j);
     if (!out) throw new Error(this._explainNoImage(j, 'compose'));
-    return 'data:' + out.mime_type + ';base64,' + out.data;
+    return 'data:' + (out.mime_type || out.mimeType) + ';base64,' + out.data;
   }
 
   async replaceBg(dataUrl) {
@@ -541,9 +553,9 @@ class GeminiDirectBackend {
     if (!r.ok) { const t = await r.text(); throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`); }
     const j = await r.json();
     try { Log.info('replaceBg raw response:', JSON.stringify(j).slice(0, 2000)); } catch(_) {}
-    const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
+    const out = pickInlineData(j);
     if (!out) throw new Error(this._explainNoImage(j, 'replaceBg'));
-    return 'data:' + out.mime_type + ';base64,' + out.data;
+    return 'data:' + (out.mime_type || out.mimeType) + ';base64,' + out.data;
   }
 
   async estimateAge(dataUrl) {
