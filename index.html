@@ -416,21 +416,31 @@ class GeminiDirectBackend {
 
   // Расшифровка ответа Gemini, когда inline_data отсутствует.
   // Часто это safety-блок: для фото с детьми/несколькими лицами политика жёстче.
+  // STOP без картинки = модель ответила текстом (нужно посмотреть что она сказала).
   _explainNoImage(j, context) {
     const block = j?.promptFeedback?.blockReason || j?.candidates?.[0]?.finishReason;
     const ratings = j?.promptFeedback?.safetyRatings || j?.candidates?.[0]?.safetyRatings || [];
     const highCats = ratings.filter(r => r.probability && r.probability !== 'NEGLIGIBLE' && r.probability !== 'LOW')
                             .map(r => r.category?.replace('HARM_CATEGORY_','')).join(', ');
+    // Текстовый ответ модели (может объяснять, почему она не сгенерировала картинку)
+    const textParts = j?.candidates?.[0]?.content?.parts?.filter(p => p.text).map(p => p.text).join(' ').trim();
+    const textHint = textParts ? ` Модель ответила текстом: «${textParts.slice(0,180)}${textParts.length>180?'…':''}»` : '';
+
     if (block === 'SAFETY' || block === 'IMAGE_SAFETY' || /safety/i.test(String(block||''))) {
       const childHint = context === 'replaceBg'
         ? ' На фото с детьми лучше работает режим «👶 Ребёнок» (серия 5 кадров или загрузка 4–12 фото) — у него промпт под document-photo, проходит фильтр чаще.'
         : '';
-      return `Gemini заблокировал по политике безопасности (${block}${highCats?', '+highCats:''}).${childHint}`;
+      return `Gemini заблокировал по политике безопасности (${block}${highCats?', '+highCats:''}).${childHint}${textHint}`;
     }
-    if (block === 'RECITATION') return 'Gemini отклонил: повтор обучающих данных.';
-    if (block === 'PROHIBITED_CONTENT') return 'Gemini отклонил: запрещённый контент.';
-    if (block) return `Gemini не вернул изображение (${block}).`;
-    return 'Gemini не вернул изображение. Попробуйте другой кадр.';
+    if (block === 'RECITATION') return 'Gemini отклонил: повтор обучающих данных.' + textHint;
+    if (block === 'PROHIBITED_CONTENT') return 'Gemini отклонил: запрещённый контент.' + textHint;
+    if (block === 'STOP') {
+      // Модель «нормально» закончила, но вместо картинки вернула текст — модель отказывается или не поняла промпт.
+      return 'Gemini вернул только текст вместо изображения.' + textHint +
+             (context === 'replaceBg' ? ' Попробуйте режим «👶 Ребёнок» или другой кадр.' : '');
+    }
+    if (block) return `Gemini не вернул изображение (${block}).` + textHint;
+    return 'Gemini не вернул изображение. Попробуйте другой кадр.' + textHint;
   }
 
   async compose(images, refMetrics, childSrc) {
@@ -464,7 +474,7 @@ class GeminiDirectBackend {
       body: JSON.stringify({
         contents:[{ parts }],
         safetySettings: this._safetySettings(),
-        generationConfig: { responseModalities: ['IMAGE'] }
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
       })
     });
     if (r.status === 429) {
@@ -484,6 +494,7 @@ class GeminiDirectBackend {
   async replaceBg(dataUrl) {
     if (!this.configured) throw new Error('Не задан API-ключ Gemini');
     const prompt =
+      'OUTPUT: return ONE edited image (not text). ' +
       'Edit this photo for use as a Russian ID document (35×45 mm passport photo). ' +
       'TASKS: ' +
       '1) Replace the background ENTIRELY with a uniform plain white (#FFFFFF) or very light gray (#F0F0F0). ' +
@@ -507,7 +518,7 @@ class GeminiDirectBackend {
           { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
         ]}],
         safetySettings: this._safetySettings(),
-        generationConfig: { responseModalities: ['IMAGE'] }
+        generationConfig: { responseModalities: ['TEXT', 'IMAGE'] }
       })
     });
     if (r.status === 429) {
