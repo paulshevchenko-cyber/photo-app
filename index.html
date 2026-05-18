@@ -1249,9 +1249,10 @@ function u8ToDataUrl(u8) {
 function showPreview(url, opts) {
   vid.style.display='none'; ov.style.display='none'; hintEl.style.display='none';
   vfEl.querySelectorAll('.prev-wrap,.bstrip').forEach(e => e.remove());
-  const badge = opts.kind === 'ai-ok'   ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
-              : opts.kind === 'ai-fb'   ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
-              : opts.kind === 'ai-bg'   ? '<div class="prev-badge">✓ AI фон заменён</div>'
+  const badge = opts.kind === 'ai-ok'     ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
+              : opts.kind === 'ai-fb'     ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
+              : opts.kind === 'ai-bg'     ? '<div class="prev-badge">✓ AI фон заменён</div>'
+              : opts.kind === 'ai-bg-warn'? '<div class="prev-badge warn">⚠ AI фон с замечанием</div>'
               : '<div class="prev-badge">✓ Фото готово</div>';
   vfEl.insertAdjacentHTML('beforeend',
     `<div class="prev-wrap"><img src="${url}"/>${badge}</div>`);
@@ -1350,19 +1351,17 @@ async function aiCleanBg() {
   po.progress(1);
   po.remove();
 
+  // Person check — жёсткий стоп: AI исказил лицо, фото нельзя использовать
   if (!okPerson) {
     toast(`AI исказил лицо: ${badPerson}. Оставляем оригинал.`, 'warn');
     Log.warn('aiCleanBg rejected — person check:', badPerson);
     return;
   }
-  if (!bgCheck.ok) {
-    toast(`AI не убрал фон: ${bgCheck.reason}. Оставляем оригинал.`, 'warn');
-    Log.warn('aiCleanBg rejected — bg check:', bgCheck.reason);
-    return;
-  }
+  // Bg check — мягкое предупреждение: показываем AI-результат, но честно сигналим,
+  // что фон не идеально однородный. Пользователь решает.
+  const maxDev = Math.max(...['iod','e2c','n2m']
+    .map(k => Math.abs(aiMetrics[k]-refMetrics[k])/refMetrics[k]*100)).toFixed(1);
 
-  // Прогоняем через тот же конвейер: ресемпл на 300 DPI + JFIF DPI.
-  // Никакой нашей пост-обработки света (AI уже отбалансировал).
   const img = await loadImage(aiUrl);
   const t = TYPES[gType];
   const sw = img.width, sh = img.height;
@@ -1373,14 +1372,22 @@ async function aiCleanBg() {
   capCv.width = cW; capCv.height = cH;
   capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
   const finalUrl = await finalizeCapturedCanvas(capCv, { skipBgFill: true, skipLight: true });
-  Backup.saveFinal(finalUrl, { kind:'ai-bg', type: gType });
-  toast(`AI фон: OK. Лицо ±${Math.max(...['iod','e2c','n2m'].map(k => Math.abs(aiMetrics[k]-refMetrics[k])/refMetrics[k]*100)).toFixed(1)}%, фон ${bgCheck.meanL.toFixed(0)}/255`, 'ok');
-  showPreview(finalUrl, { kind:'ai-bg' });
+  Backup.saveFinal(finalUrl, { kind: bgCheck.ok ? 'ai-bg' : 'ai-bg-warn', type: gType, bgCheck });
+
+  if (bgCheck.ok) {
+    toast(`AI фон: OK. Лицо ±${maxDev}%, фон ${bgCheck.meanL.toFixed(0)}/255`, 'ok');
+    showPreview(finalUrl, { kind:'ai-bg' });
+  } else {
+    toast(`AI фон выдал результат с замечанием: ${bgCheck.reason}. Лицо ±${maxDev}% — ок. Посмотрите.`, 'warn');
+    Log.warn('aiCleanBg shown with bg warning:', bgCheck.reason);
+    showPreview(finalUrl, { kind:'ai-bg-warn' });
+  }
 }
 
-/* Проверка: реально ли фон стал белым.
-   Сэмплируем верх/низ/лево/право по 6% от размера,
-   считаем среднюю яркость и стандартное отклонение. */
+/* Проверка фона: сэмплируем ТОЛЬКО верхнюю полосу (~15% высоты).
+   В document-photo голова занимает 70–80% от верха к низу, а плечи/одежда
+   неизбежно попадают в боковые и нижнюю полосы — давая ложный «неоднородный фон».
+   Верх над макушкой — единственная зона, где надёжно виден чистый фон. */
 async function checkBackgroundWhite(dataUrl) {
   const img = await loadImage(dataUrl);
   const cv = document.createElement('canvas');
@@ -1388,23 +1395,18 @@ async function checkBackgroundWhite(dataUrl) {
   const cx = cv.getContext('2d');
   cx.drawImage(img, 0, 0);
   const w = cv.width, h = cv.height;
-  const stripW = Math.max(2, w*0.06|0), stripH = Math.max(2, h*0.06|0);
+  const stripH = Math.max(8, h*0.12|0);  // верхние 12%
+  const sideInset = Math.max(2, w*0.05|0);  // отступ 5% от боков, чтобы не зацепить уши/волосы
+  const d = cx.getImageData(sideInset, 0, w - 2*sideInset, stripH).data;
   const samples = [];
-  const eat = (x0,y0,sw,sh) => {
-    const d = cx.getImageData(x0,y0,sw,sh).data;
-    for (let i=0; i<d.length; i+=4) {
-      samples.push(.299*d[i] + .587*d[i+1] + .114*d[i+2]);
-    }
-  };
-  eat(0,0,w,stripH);             // top
-  eat(0,h-stripH,w,stripH);      // bottom
-  eat(0,stripH,stripW,h-2*stripH); // left
-  eat(w-stripW,stripH,stripW,h-2*stripH); // right
+  for (let i=0; i<d.length; i+=4) {
+    samples.push(.299*d[i] + .587*d[i+1] + .114*d[i+2]);
+  }
   const meanL = samples.reduce((a,b)=>a+b,0) / samples.length;
   const varL = samples.reduce((a,b)=>a + (b-meanL)*(b-meanL), 0) / samples.length;
   const stdL = Math.sqrt(varL);
-  if (meanL < 215) return { ok:false, meanL, stdL, reason:`средняя яркость краёв ${meanL.toFixed(0)}/255 (нужно ≥ 215)` };
-  if (stdL > 25)   return { ok:false, meanL, stdL, reason:`фон неоднородный (σ=${stdL.toFixed(0)}, нужно ≤ 25)` };
+  if (meanL < 200) return { ok:false, meanL, stdL, reason:`верх фона тёмный, средняя яркость ${meanL.toFixed(0)}/255 (нужно ≥ 200)` };
+  if (stdL > 35)   return { ok:false, meanL, stdL, reason:`верх фона неоднородный, σ=${stdL.toFixed(0)} (нужно ≤ 35)` };
   return { ok:true, meanL, stdL };
 }
 
