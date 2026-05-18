@@ -660,7 +660,43 @@
         // Honor queued turn only if (a) at intersection, and (b) the target direction
         // is consistent with the destination cell's legal lane direction — so we
         // don't end up on oncoming traffic right after the turn.
-        if (car.nextDir && opts.indexOf(car.nextDir) !== -1 && isIntersection(r, c)) {
+        const onRA = inRoundaboutZone(car.x, car.y) && isIntersection(r, c);
+        if (onRA) {
+          // Roundabout: only exit when destination is a regular road cell
+          // (not another roundabout cell) with the matching legal lane.
+          // Otherwise force counter-clockwise rotation around the centre,
+          // so the player circles until they actually reach their exit.
+          let exited = false;
+          if (car.nextDir && opts.indexOf(car.nextDir) !== -1) {
+            const nx = c + DIRS[car.nextDir].dx;
+            const ny = r + DIRS[car.nextDir].dy;
+            if (isRoad(ny, nx) && !isIntersection(ny, nx)) {
+              const dl = legalDirs(ny, nx);
+              if (dl.length === 0 || dl.indexOf(car.nextDir) !== -1) {
+                car.dir = car.nextDir;
+                car.nextDir = null;
+                exited = true;
+              }
+            }
+          }
+          if (!exited && !car.nextDir && opts.indexOf(car.dir) !== -1) {
+            const nx = c + DIRS[car.dir].dx;
+            const ny = r + DIRS[car.dir].dy;
+            if (isRoad(ny, nx) && !isIntersection(ny, nx)) {
+              const dl = legalDirs(ny, nx);
+              if (dl.length === 0 || dl.indexOf(car.dir) !== -1) exited = true;
+            }
+          }
+          if (!exited) {
+            const a = Math.atan2(car.y - ROUNDABOUT.y, car.x - ROUNDABOUT.x);
+            let preferred;
+            if (a > -Math.PI && a <= -Math.PI/2) preferred = 'S';
+            else if (a > -Math.PI/2 && a <= 0) preferred = 'W';
+            else if (a > 0 && a <= Math.PI/2) preferred = 'N';
+            else preferred = 'E';
+            if (opts.indexOf(preferred) !== -1) car.dir = preferred;
+          }
+        } else if (car.nextDir && opts.indexOf(car.nextDir) !== -1 && isIntersection(r, c)) {
           const nx = c + DIRS[car.nextDir].dx;
           const ny = r + DIRS[car.nextDir].dy;
           const destLegal = legalDirs(ny, nx);
@@ -1235,6 +1271,27 @@
         ai.speed = 0;
         player.speed = 0;
         cleanDriveStart = gameTime;
+        // If we just ate a head-on while on the wrong lane, snap into the
+        // parallel correct lane and park the car so the player can recover.
+        if (playerOnWrongLane()) {
+          const pc = Math.floor(player.x / CELL), pr = Math.floor(player.y / CELL);
+          const isVert = player.dir === 'N' || player.dir === 'S';
+          const cands = isVert ? [[pr, pc + 1], [pr, pc - 1]] : [[pr + 1, pc], [pr - 1, pc]];
+          for (const cand of cands) {
+            const sr = cand[0], sc = cand[1];
+            if (!isRoad(sr, sc) || isIntersection(sr, sc)) continue;
+            const sl = legalDirs(sr, sc);
+            if (sl.indexOf(player.dir) !== -1) {
+              const nc = cellCenter(sr, sc);
+              player.x = nc.x; player.y = nc.y;
+              player.lastCell = sr * 100 + sc;
+              showToast('↔️ Перестроился в свою полосу', 'good', 1600);
+              break;
+            }
+          }
+        }
+        player.braking = true;
+        syncBrakeBtn();
         return;
       }
     }
@@ -1516,7 +1573,10 @@
     goal = 30 + (level - 1) * 25;
     document.getElementById('goal').textContent = goal;
     // Player starts in southwest road, going east (on bottom-right lane of horiz road row 23)
+    // Car begins parked — kids press ▲ to start moving.
     player = makeCar(23, 4, 'E', '#e53935', true);
+    player.braking = true;
+    syncBrakeBtn();
     spawnAICars(Math.min(4 + level, 10));
     spawnPassenger();
     seenSigns = new Set(JSON.parse(localStorage.getItem('taxi_seen_signs') || '[]'));
@@ -1580,6 +1640,7 @@
     if (!running || paused || !player) return;
     if (audio && audio.state === 'suspended') audio.resume();
     player.braking = false;
+    syncBrakeBtn();
     // Wake car if fully stopped without dir
     if (!player.dir) {
       const c = Math.floor(player.x / CELL), r = Math.floor(player.y / CELL);
@@ -1589,6 +1650,16 @@
   }
   function setBrake(on) {
     if (player) player.braking = on;
+    syncBrakeBtn();
+  }
+  // Sticky brake: ▼ taps engage the brake, only ▲ releases it.
+  // We sync the brake button's pressed look with the actual state so the
+  // player always sees whether the car is parked.
+  function syncBrakeBtn() {
+    const btn = document.getElementById('b-down');
+    if (!btn || !player) return;
+    if (player.braking) btn.classList.add('held');
+    else btn.classList.remove('held');
   }
 
   document.addEventListener('keydown', (e) => {
@@ -1600,15 +1671,12 @@
     else if (e.key === ' ') { togglePause(); e.preventDefault(); }
     else if (e.key === 'n' || e.key === 'N') { toggleNav(); }
   });
-  document.addEventListener('keyup', (e) => {
-    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') { setBrake(false); }
-  });
 
   function bindButton(id, kind) {
     const el = document.getElementById(id);
     function down(e) {
       if (e && e.cancelable) e.preventDefault();
-      el.classList.add('held');
+      if (kind !== 'brake') el.classList.add('held');
       if (kind === 'brake') setBrake(true);
       else if (kind === 'go') goForward();
       else if (kind === 'left') turnRel('L');
@@ -1616,8 +1684,7 @@
     }
     function up(e) {
       if (e && e.cancelable) e.preventDefault();
-      el.classList.remove('held');
-      if (kind === 'brake') setBrake(false);
+      if (kind !== 'brake') el.classList.remove('held');
     }
     if (window.PointerEvent) {
       el.addEventListener('pointerdown', down);
@@ -1648,10 +1715,10 @@
     const dx = e.changedTouches[0].clientX - tStartX;
     const dy = e.changedTouches[0].clientY - tStartY;
     if (Math.abs(dx) < 20 && Math.abs(dy) < 20) return;
-    // Swipe left/right = turn left/right; swipe up = forward; swipe down = brake briefly
+    // Swipe left/right = turn left/right; swipe up = go; swipe down = full stop
     if (Math.abs(dx) > Math.abs(dy)) turnRel(dx > 0 ? 'R' : 'L');
     else if (dy < 0) goForward();
-    else { setBrake(true); setTimeout(() => setBrake(false), 400); }
+    else setBrake(true);
   });
 
   // Pause / Nav buttons
@@ -1835,8 +1902,8 @@
     text:
       'Работай таксистом по правилам!<br><br>' +
       '👤 — подбери пассажира, 🏁 — отвези к флажку<br>' +
-      '▲ — поехали (после остановки)<br>' +
-      '▼ — тормоз (зажать, чтобы стоять)<br>' +
+      '<b>Машина стоит. Нажми ▲ чтобы поехать.</b><br>' +
+      '▲ — старт / тронуться &nbsp; ▼ — стоп<br>' +
       '◀ ▶ — поворот налево / направо на ближайшем перекрёстке<br>' +
       '⏸ — пауза &nbsp; 🔊 — навигатор &nbsp; 📱 — наклон<br><br>' +
       'Знаки 🛑🔻🔄🚶 объясняются, когда увидишь их в первый раз.<br>' +
