@@ -520,7 +520,12 @@ class GeminiDirectBackend {
       'TASKS: ' +
       '1) Replace the background ENTIRELY with a uniform plain white (#FFFFFF) or very light gray (#F0F0F0). ' +
       '   Remove every trace of the original surroundings — walls, car interior, seat belts, furniture, other people, shadows on the background. ' +
-      '2) Even out the lighting on the face: remove harsh shadows under the chin, eyes, and nose. Lighting should be soft and frontal. ' +
+      '2) Even out the lighting on the face: remove harsh shadows under the chin, eyes, and nose. ' +
+      '   Apply a SOFT, MATTE, evenly-diffused frontal studio light typical of a passport-photo booth: ' +
+      '   - NO specular highlights or shiny spots on forehead, nose, cheeks, chin (matte skin). ' +
+      '   - NO directional shadows (no shadow under nose/chin, no shadow on neck from the head). ' +
+      '   - NO hot/blown-out spots. Lighting strictly soft, flat, frontal, like a softbox in front of the subject. ' +
+      '   The result should look like a real studio document photo. ' +
       '3) If the photo is a selfie with one shoulder raised, twisted, or an arm/elbow visible reaching toward the camera, ' +
       '   naturally relax the body into a normal, level, forward-facing portrait pose: both shoulders horizontal and even, ' +
       '   no arm visible, no stretched neck. Reconstruct the missing side of the torso plausibly with the SAME clothing. ' +
@@ -1431,15 +1436,28 @@ async function aiCleanBg() {
   }
   const maxDev = (maxDevPct*100).toFixed(1);
 
-  const img = await loadImage(aiUrl);
-  const t = TYPES[gType];
-  const sw = img.width, sh = img.height;
-  let cW, cH;
-  if (sw/sh > t.aspect) { cH = sh; cW = (sh*t.aspect)|0; }
-  else                  { cW = sw; cH = (sw/t.aspect)|0; }
-  const sx = ((sw-cW)/2)|0, sy = ((sh-cH)/2)|0;
-  capCv.width = cW; capCv.height = cH;
-  capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+  // Smart-reframe: подгоняем кадр AI-результата под ГОСТ (центрируем лицо,
+  // глаза на 60% от низа, голова 75% высоты). AI часто кадрирует криво —
+  // мы знаем точные пропорции лица из measureFaceMetrics, можем переобрезать.
+  let reframedCv;
+  try {
+    reframedCv = await smartReframe(aiUrl, aiMetrics, TYPES[gType]);
+    Log.info('smartReframe done: out =', reframedCv.width + 'x' + reframedCv.height);
+  } catch (e) {
+    Log.warn('smartReframe failed, falling back to center-crop:', e.message);
+    const img = await loadImage(aiUrl);
+    const t = TYPES[gType];
+    const sw = img.width, sh = img.height;
+    let cW, cH;
+    if (sw/sh > t.aspect) { cH = sh; cW = (sh*t.aspect)|0; }
+    else                  { cW = sw; cH = (sw/t.aspect)|0; }
+    const sx = ((sw-cW)/2)|0, sy = ((sh-cH)/2)|0;
+    reframedCv = document.createElement('canvas');
+    reframedCv.width = cW; reframedCv.height = cH;
+    reframedCv.getContext('2d').drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+  }
+  capCv.width = reframedCv.width; capCv.height = reframedCv.height;
+  capCtx.drawImage(reframedCv, 0, 0);
   const finalUrl = await finalizeCapturedCanvas(capCv, { skipBgFill: true, skipLight: true });
 
   // ГОСТ-проверка финального результата: высота головы, линия глаз, фон
@@ -1467,6 +1485,65 @@ async function aiCleanBg() {
     Log.warn('aiCleanBg soft-fail:', issues.join('; '));
     showPreview(finalUrl, { kind:'ai-bg-warn', gost, maxDevPct });
   }
+}
+
+/* Smart-reframe: AI часто отдаёт фото с лицом не по центру и неправильной
+   высотой головы. Используя точные координаты лица (от MediaPipe), мы
+   переобрезаем результат под ГОСТ: лицо по центру X, голова 75% высоты,
+   глаза 60% от низа. Если AI-картинка меньше нужного кропа в какой-то
+   стороне — добавляем белые поля. */
+async function smartReframe(dataUrl, metrics, typeSpec) {
+  const TARGET_HEAD_PCT = 0.75;          // голова занимает 75% высоты выхода
+  const TARGET_EYE_FROM_BOTTOM = 0.63;   // середина диапазона 56-70%
+  const HAIR_MULT = 1.18;                // bbox без волос → real head height
+
+  const img = await loadImage(dataUrl);
+  const W = img.width, H = img.height;
+  const aspect = typeSpec.aspect;        // 35/45 ≈ 0.778
+
+  // Реальная высота головы в пикселях источника (с поправкой на волосы)
+  const headH_src = metrics.bboxHeight * H;  // bboxHeight уже умножен на 1.18 в measureFaceMetrics
+  // Линия глаз в пикселях источника
+  const eyeY_src = metrics.eyeYRel * H;
+  // Центр лица в пикселях источника
+  const faceCX_src = metrics.bboxCenterX * W;
+  // Поскольку bbox не включает волосы, реальный «центр головы» немного выше bboxCenterY.
+  // Для smart-reframe нам важен eye Y (он точный) — от него и считаем.
+
+  // Размер кропа: голова должна стать TARGET_HEAD_PCT от высоты → cropH = headH_src / TARGET_HEAD_PCT
+  let cropH = headH_src / TARGET_HEAD_PCT;
+  let cropW = cropH * aspect;
+
+  // Координаты кропа: face center по горизонтали, eye Y на (1-TARGET_EYE_FROM_BOTTOM) от верха кропа
+  let cropX = faceCX_src - cropW / 2;
+  let cropY = eyeY_src - (1 - TARGET_EYE_FROM_BOTTOM) * cropH;
+
+  // Если кроп выходит за границы — определяем сколько белых полей нужно
+  const padL = Math.max(0, -cropX);
+  const padT = Math.max(0, -cropY);
+  const padR = Math.max(0, (cropX + cropW) - W);
+  const padB = Math.max(0, (cropY + cropH) - H);
+
+  const out = document.createElement('canvas');
+  out.width  = Math.round(cropW);
+  out.height = Math.round(cropH);
+  const ox = out.getContext('2d');
+  // Заливаем белым (фон) на случай, если будут поля
+  ox.fillStyle = '#FFFFFF';
+  ox.fillRect(0, 0, out.width, out.height);
+
+  // Источник: clamp к границам картинки
+  const sX = Math.max(0, cropX);
+  const sY = Math.max(0, cropY);
+  const sW = Math.min(W - sX, cropW - padL - padR);
+  const sH = Math.min(H - sY, cropH - padT - padB);
+  // Дестинация: смещение на padL/padT внутри out
+  ox.drawImage(img, sX, sY, sW, sH, padL, padT, sW, sH);
+
+  Log.info(`smartReframe: src ${W}x${H}, crop ${Math.round(cropW)}x${Math.round(cropH)}, ` +
+    `face cx=${(metrics.bboxCenterX*100).toFixed(0)}% eyeY=${(metrics.eyeYRel*100).toFixed(0)}% headH=${(metrics.bboxHeight*100).toFixed(0)}%, ` +
+    `pads L${padL.toFixed(0)} T${padT.toFixed(0)} R${padR.toFixed(0)} B${padB.toFixed(0)}`);
+  return out;
 }
 
 /* ГОСТ-проверка для итогового кадра: высота головы и линия глаз.
@@ -1765,7 +1842,11 @@ async function measureFaceMetrics(dataUrl) {
       // bbox не покрывает темя (волосы), поэтому headPct ≈ bb.height * 1.18 эмпирически.
       const bboxHeight = Math.min(1, bb.height * 1.18);
       const eyeFromBottom = 1 - eyeMidY;
-      settle({ iod, e2c, n2m, yaw, roll, faceCount, bboxHeight, eyeFromBottom });
+      // Координаты центра лица для smart-reframe
+      const bboxCenterX = bb.xCenter;
+      const bboxCenterY = bb.yCenter;
+      const eyeYRel = eyeMidY;  // 0..1 от верха кадра
+      settle({ iod, e2c, n2m, yaw, roll, faceCount, bboxHeight, eyeFromBottom, bboxCenterX, bboxCenterY, eyeYRel });
     };
     try { window._fd.onResults(once); } catch (e) { return settle(null); }
     const timeout = setTimeout(() => settle(null), 3000);
