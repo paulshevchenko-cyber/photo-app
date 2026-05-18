@@ -403,6 +403,17 @@ class GeminiDirectBackend {
   constructor(key) { this.key = key; }
   get configured() { return !!this.key; }
 
+  // Релакс safety-фильтра до BLOCK_NONE. Для задачи «document photo» все
+  // категории не релевантны — мы только редактируем фон/позу. Дефолтные
+  // BLOCK_MEDIUM_AND_ABOVE слишком жёсткие и блокируют адекватные фото лиц.
+  _safetySettings() {
+    return [
+      'HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH',
+      'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT',
+      'HARM_CATEGORY_CIVIC_INTEGRITY'
+    ].map(category => ({ category, threshold: 'BLOCK_NONE' }));
+  }
+
   // Расшифровка ответа Gemini, когда inline_data отсутствует.
   // Часто это safety-блок: для фото с детьми/несколькими лицами политика жёстче.
   _explainNoImage(j, context) {
@@ -450,7 +461,11 @@ class GeminiDirectBackend {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(this.key)}`;
     const r = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ contents:[{ parts }] })
+      body: JSON.stringify({
+        contents:[{ parts }],
+        safetySettings: this._safetySettings(),
+        generationConfig: { responseModalities: ['IMAGE'] }
+      })
     });
     if (r.status === 429) {
       throw new Error('Лимит Gemini исчерпан. Бесплатный тариф даёт ~10 генераций изображений в день. ' +
@@ -486,10 +501,14 @@ class GeminiDirectBackend {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(this.key)}`;
     const r = await fetch(url, {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ contents:[{ parts:[
-        { text: prompt },
-        { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
-      ]}]})
+      body: JSON.stringify({
+        contents:[{ parts:[
+          { text: prompt },
+          { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
+        ]}],
+        safetySettings: this._safetySettings(),
+        generationConfig: { responseModalities: ['IMAGE'] }
+      })
     });
     if (r.status === 429) {
       throw new Error('Лимит Gemini исчерпан. Бесплатный тариф даёт ~10 генераций изображений в день. ' +
