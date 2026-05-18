@@ -43,7 +43,7 @@ input,select,textarea{font-family:inherit}
 
 /* Viewfinder */
 .vf{flex:1;position:relative;background:#111;overflow:hidden;min-height:0}
-#vid{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;display:block;background:#111}
+#vid{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:contain;display:block;background:#111}
 .mirror{transform:scaleX(-1)}
 #ov{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 
@@ -433,6 +433,10 @@ class GeminiDirectBackend {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ contents:[{ parts }] })
     });
+    if (r.status === 429) {
+      throw new Error('Лимит Gemini исчерпан. Бесплатный тариф даёт ~10 генераций изображений в день. ' +
+        'Подождите минуту или подключите биллинг: ai.google.dev → API key → Enable billing.');
+    }
     if (!r.ok) {
       const t = await r.text();
       throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`);
@@ -451,10 +455,13 @@ class GeminiDirectBackend {
       '1) Replace the background ENTIRELY with a uniform plain white (#FFFFFF) or very light gray (#F0F0F0). ' +
       '   Remove every trace of the original surroundings — walls, car interior, seat belts, furniture, other people, shadows on the background. ' +
       '2) Even out the lighting on the face: remove harsh shadows under the chin, eyes, and nose. Lighting should be soft and frontal. ' +
+      '3) If the photo is a selfie with one shoulder raised, twisted, or an arm/elbow visible reaching toward the camera, ' +
+      '   naturally relax the body into a normal, level, forward-facing portrait pose: both shoulders horizontal and even, ' +
+      '   no arm visible, no stretched neck. Reconstruct the missing side of the torso plausibly with the SAME clothing. ' +
       'STRICT — DO NOT CHANGE: ' +
       'a) The person\'s face — keep eye spacing, nose length, chin shape, head proportions and skin tone EXACTLY as in the input (within 5%). ' +
       'b) Hair (color, style, length, fly-aways). Beard, eyebrows, moles, freckles, glasses. ' +
-      'c) Clothing color and cut at the visible shoulders/neck. ' +
+      'c) Clothing color, pattern and material — only the cut at the shoulders may be adjusted to make them level. ' +
       'd) Apparent age of the person. ' +
       'Output: same aspect ratio as input, photographic realism, no cartoon/painting style.';
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key=${encodeURIComponent(this.key)}`;
@@ -465,6 +472,10 @@ class GeminiDirectBackend {
         { inline_data:{ mime_type:'image/jpeg', data: dataUrl.split(',')[1] } }
       ]}]})
     });
+    if (r.status === 429) {
+      throw new Error('Лимит Gemini исчерпан. Бесплатный тариф даёт ~10 генераций изображений в день. ' +
+        'Подождите минуту или подключите биллинг: ai.google.dev → API key → Enable billing.');
+    }
     if (!r.ok) { const t = await r.text(); throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`); }
     const j = await r.json();
     const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
@@ -735,13 +746,31 @@ function startOverlay() {
   gRaf = requestAnimationFrame(loop);
 }
 
+/* Real video bounds inside viewfinder when using object-fit:contain.
+   Letterboxed/pillarboxed depending on video vs viewfinder aspect ratio. */
+function getVideoBounds(W, H) {
+  const vw = vid.videoWidth, vh = vid.videoHeight;
+  if (!vw || !vh) return { x:0, y:0, w:W, h:H };
+  const vAsp = vw/vh, fAsp = W/H;
+  if (vAsp > fAsp) {                    // video wider → letterbox top/bottom
+    const h = W / vAsp;
+    return { x:0, y:(H-h)/2|0, w:W, h:h|0 };
+  } else {                              // video taller → pillarbox sides
+    const w = H * vAsp;
+    return { x:(W-w)/2|0, y:0, w:w|0, h:H };
+  }
+}
+
 function drawGuides(W, H) {
   const t = TYPES[gType];
-  let fH = H*.83, fW = fH * t.aspect;
-  if (fW > W*.78) { fW = W*.78; fH = fW / t.aspect; }
-  const fX = (W-fW)/2 | 0, fY = (H-fH)/2 | 0;
+  const vb = getVideoBounds(W, H);
+  // crop frame fits inside visible video area
+  let fH = vb.h*.83, fW = fH * t.aspect;
+  if (fW > vb.w*.78) { fW = vb.w*.78; fH = fW / t.aspect; }
+  const fX = (vb.x + (vb.w-fW)/2) | 0, fY = (vb.y + (vb.h-fH)/2) | 0;
 
   octx.fillStyle = 'rgba(0,0,0,.52)';
+  // dim everything outside the crop frame — including letterbox bars
   octx.fillRect(0,0,W,fY);
   octx.fillRect(0,fY+fH,W,H-fY-fH);
   octx.fillRect(0,fY,fX,fH);
