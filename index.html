@@ -403,6 +403,25 @@ class GeminiDirectBackend {
   constructor(key) { this.key = key; }
   get configured() { return !!this.key; }
 
+  // Расшифровка ответа Gemini, когда inline_data отсутствует.
+  // Часто это safety-блок: для фото с детьми/несколькими лицами политика жёстче.
+  _explainNoImage(j, context) {
+    const block = j?.promptFeedback?.blockReason || j?.candidates?.[0]?.finishReason;
+    const ratings = j?.promptFeedback?.safetyRatings || j?.candidates?.[0]?.safetyRatings || [];
+    const highCats = ratings.filter(r => r.probability && r.probability !== 'NEGLIGIBLE' && r.probability !== 'LOW')
+                            .map(r => r.category?.replace('HARM_CATEGORY_','')).join(', ');
+    if (block === 'SAFETY' || block === 'IMAGE_SAFETY' || /safety/i.test(String(block||''))) {
+      const childHint = context === 'replaceBg'
+        ? ' На фото с детьми лучше работает режим «👶 Ребёнок» (серия 5 кадров или загрузка 4–12 фото) — у него промпт под document-photo, проходит фильтр чаще.'
+        : '';
+      return `Gemini заблокировал по политике безопасности (${block}${highCats?', '+highCats:''}).${childHint}`;
+    }
+    if (block === 'RECITATION') return 'Gemini отклонил: повтор обучающих данных.';
+    if (block === 'PROHIBITED_CONTENT') return 'Gemini отклонил: запрещённый контент.';
+    if (block) return `Gemini не вернул изображение (${block}).`;
+    return 'Gemini не вернул изображение. Попробуйте другой кадр.';
+  }
+
   async compose(images, refMetrics, childSrc) {
     if (!this.configured) throw new Error('Не задан API-ключ Gemini');
     const refTxt = refMetrics
@@ -443,7 +462,7 @@ class GeminiDirectBackend {
     }
     const j = await r.json();
     const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
-    if (!out) throw new Error('AI не вернул изображение. Возможно, фильтр безопасности отклонил запрос.');
+    if (!out) throw new Error(this._explainNoImage(j, 'compose'));
     return 'data:' + out.mime_type + ';base64,' + out.data;
   }
 
@@ -479,7 +498,7 @@ class GeminiDirectBackend {
     if (!r.ok) { const t = await r.text(); throw new Error(`Gemini ${r.status}: ${t.slice(0,200)}`); }
     const j = await r.json();
     const out = j.candidates?.[0]?.content?.parts?.find(p => p.inline_data)?.inline_data;
-    if (!out) throw new Error('AI не вернул изображение. Возможно, фильтр безопасности отклонил запрос.');
+    if (!out) throw new Error(this._explainNoImage(j, 'replaceBg'));
     return 'data:' + out.mime_type + ';base64,' + out.data;
   }
 
@@ -1212,15 +1231,26 @@ async function aiCleanBg() {
   const source = gLastSourceUrl || gLastPhotoUrl;
   if (!source) { toast('Нет исходного фото', 'err'); return; }
 
-  const po = showProcessing('замена фона через Gemini');
-  po.step('1/4: измеряем исходные пропорции');
-  po.progress(0.1);
-  const refMetrics = await measureFaceMetrics(source);
-  if (!refMetrics) {
-    po.remove();
+  // Pre-flight: считаем лица в кадре отдельно от processing UI
+  const preMetrics = await measureFaceMetrics(source);
+  if (!preMetrics) {
     toast('Не нашёл лицо на исходном фото — нельзя проверить искажения', 'warn');
     return;
   }
+  if (preMetrics.faceCount > 1) {
+    const ok = confirm(
+      `В кадре ${preMetrics.faceCount} лица. AI может оставить не того, и фильтр Gemini ` +
+      `часто отвергает такие фото (особенно с детьми). Снимите крупнее, чтобы был только нужный человек.\n\n` +
+      `Если фото для ребёнка — используйте режим «👶 Ребёнок» внизу: серия 5 кадров одного ребёнка.\n\n` +
+      `Продолжить всё равно?`);
+    if (!ok) return;
+  }
+
+  let po = showProcessing('замена фона через Gemini');
+  po.step('1/4: пропорции исходника');
+  po.substep(`найдено ${preMetrics.faceCount} лиц(о)`);
+  po.progress(0.1);
+  const refMetrics = preMetrics;
   Log.info('aiCleanBg ref:', refMetrics);
 
   po.step('2/4: Gemini заменяет фон');
@@ -1542,7 +1572,11 @@ async function measureFaceMetrics(dataUrl) {
     };
     const once = (r) => {
       if (!r.detections || !r.detections.length) return settle(null);
-      const det = r.detections[0], bb = det.boundingBox, lm = det.landmarks;
+      // Use the largest face (most likely the subject) but report total count
+      const faceCount = r.detections.length;
+      const det = r.detections.reduce((a,b) =>
+        (a.boundingBox.width * a.boundingBox.height) >= (b.boundingBox.width * b.boundingBox.height) ? a : b);
+      const bb = det.boundingBox, lm = det.landmarks;
       if (!lm || lm.length < 4) return settle(null);
       const re=lm[0], le=lm[1], nose=lm[2], mouth=lm[3];
       const iod = Math.abs(le.x - re.x);
@@ -1551,7 +1585,7 @@ async function measureFaceMetrics(dataUrl) {
       const n2m = mouth.y - nose.y;
       const yaw = (nose.x - (re.x + le.x)/2) / bb.width;
       const roll = Math.atan2(le.y-re.y, le.x-re.x) * 180/Math.PI;
-      settle({ iod, e2c, n2m, yaw, roll });
+      settle({ iod, e2c, n2m, yaw, roll, faceCount });
     };
     try { window._fd.onResults(once); } catch (e) { return settle(null); }
     const timeout = setTimeout(() => settle(null), 3000);
