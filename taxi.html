@@ -670,7 +670,41 @@
           }
         }
         if (opts.indexOf(car.dir) === -1) {
-          car.dir = opts[0] || null;
+          // Prefer a continuation whose destination lane is legal — avoids
+          // auto-flipping the player onto oncoming traffic at map edges.
+          let next = null;
+          for (const d of opts) {
+            const dr = r + DIRS[d].dy, dc = c + DIRS[d].dx;
+            if (!isRoad(dr, dc)) continue;
+            const dl = legalDirs(dr, dc);
+            if (dl.length === 0 || dl.indexOf(d) !== -1) { next = d; break; }
+          }
+          if (next) {
+            car.dir = next;
+          } else if (car.dir) {
+            // Dead-end: snap player into the parallel correctly-directed lane.
+            const opp = OPP[car.dir];
+            const isVert = car.dir === 'N' || car.dir === 'S';
+            const cands = isVert ? [[r, c + 1], [r, c - 1]] : [[r + 1, c], [r - 1, c]];
+            let snapped = false;
+            for (const cand of cands) {
+              const sr = cand[0], sc = cand[1];
+              if (!isRoad(sr, sc) || isIntersection(sr, sc)) continue;
+              const sl = legalDirs(sr, sc);
+              if (sl.indexOf(opp) !== -1) {
+                const nc = cellCenter(sr, sc);
+                car.x = nc.x; car.y = nc.y;
+                car.dir = opp;
+                car.lastCell = sr * 100 + sc;
+                showToast('🔄 Тупик — разворот', '', 1400);
+                snapped = true;
+                break;
+              }
+            }
+            if (!snapped) { car.dir = null; car.speed = 0; }
+          } else {
+            car.dir = opts[0] || null;
+          }
         }
       } else {
         // AI logic — only consider directions whose destination lane is legal,
@@ -1123,8 +1157,7 @@
       // skip if direction doesn't match
       if (sign.dir !== player.dir) continue;
       // skip if cooldown active (already shown recently)
-      const cd = signCooldown.get(sign) || 0;
-      if (gameTime - cd < 6000) continue;
+      if (signCooldown.has(sign) && gameTime - signCooldown.get(sign) < 6000) continue;
       // check if player is inside the trigger box
       if (player.x >= sign.tx && player.x < sign.tx + sign.tw &&
           player.y >= sign.ty && player.y < sign.ty + sign.th) {
