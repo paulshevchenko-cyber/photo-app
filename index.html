@@ -449,6 +449,13 @@ class GeminiDirectBackend {
     }
     if (block === 'RECITATION') return 'Gemini отклонил: повтор обучающих данных.' + textHint;
     if (block === 'PROHIBITED_CONTENT') return 'Gemini отклонил: запрещённый контент.' + textHint;
+    if (block === 'IMAGE_OTHER' || block === 'IMAGE_PROHIBITED' || block === 'IMAGE_RECITATION') {
+      const fm = j?.candidates?.[0]?.finishMessage || '';
+      const hint = /rephras/i.test(fm)
+        ? 'промпт неоднозначный для этой картинки. Попробуйте «🔁 AI ещё попытка» — каждая попытка идёт через рандом, часто помогает.'
+        : (fm || 'модель отказалась генерить.');
+      return `Gemini не смог сгенерировать изображение (${block}): ${hint}`;
+    }
     if (block === 'STOP') {
       // Модель «нормально» закончила, но вместо картинки вернула текст — модель отказывается или не поняла промпт.
       return 'Gemini вернул только текст вместо изображения.' + textHint +
@@ -511,39 +518,20 @@ class GeminiDirectBackend {
     if (!this.configured) throw new Error('Не задан API-ключ Gemini');
     const prompt =
       'OUTPUT: return ONE edited image (not text). ' +
-      'Edit this photo for use as a Russian ID document (35×45 mm passport photo). ' +
-      'OUTPUT FRAMING (CRITICAL — fix even if it means re-framing): ' +
-      '- Head occupies 70–80% of the frame HEIGHT. Resize/reframe if needed (keep 35:45 aspect). ' +
-      '- Eyes positioned at 60–65% from the BOTTOM of the frame. ' +
-      '- LEAVE 3–5% white margin above the top of the hair (crown). NEVER crop hair at the top edge. ' +
-      '- Show head, neck and tops of shoulders. ' +
+      'This is a portrait already framed for a Russian ID document (35×45 mm). ' +
+      'KEEP the existing framing, aspect ratio, and head position. ' +
       'TASKS: ' +
-      '1) Replace the background ENTIRELY with a uniform plain white (#FFFFFF) or very light gray (#F0F0F0). ' +
-      '   Remove every trace of the original surroundings — walls, car interior, seat belts, furniture, other people, shadows on the background. ' +
-      '2) Even out the lighting on the face: remove harsh shadows under the chin, eyes, and nose. ' +
-      '   Apply a SOFT, MATTE, evenly-diffused frontal studio light typical of a passport-photo booth: ' +
-      '   - NO specular highlights or shiny spots on forehead, nose, cheeks, chin (matte skin). ' +
-      '   - NO directional shadows (no shadow under nose/chin, no shadow on neck from the head). ' +
-      '   - NO hot/blown-out spots. Lighting strictly soft, flat, frontal, like a softbox in front of the subject. ' +
-      '   The result should look like a real studio document photo. ' +
-      '3) If the photo is a selfie with one shoulder raised, twisted, or an arm/elbow visible reaching toward the camera, ' +
-      '   naturally relax the body into a normal, level, forward-facing portrait pose: both shoulders horizontal and even, ' +
-      '   no arm visible, no stretched neck. Reconstruct the missing side of the torso plausibly with the SAME clothing. ' +
-      '4) If the mouth is open (smiling, talking, gasping), close it to a relaxed neutral expression: ' +
-      '   lips gently touching, no teeth visible, no smile. Preserve the natural shape and color of the lips. ' +
-      '5) Apply professional passport-studio skin retouch (visible, not subtle): ' +
-      '   - Reduce under-eye darkness/bags by approximately 50%. ' +
-      '   - Reduce visibility of fine wrinkles around eyes and forehead by approximately 30%. ' +
-      '   - Even out skin tone unevenness: remove blotchy redness, smooth blemishes, fade temporary spots. ' +
-      '   - Keep visible skin texture and pores — NO airbrushed / plastic / 3D look. ' +
-      '   ALWAYS PRESERVE these distinctive features unchanged: beard, eyebrows, MOLES, FRECKLES, birthmarks, ' +
-      '   scars, glasses, piercings, hairstyle. Result must read as "the same person, looking healthy and rested". ' +
-      'STRICT — DO NOT CHANGE: ' +
-      'a) The person\'s face geometry — keep eye spacing, nose length, chin shape, head proportions and skin tone. ' +
-      'b) Hair color, style, length. ' +
-      'c) Clothing color, pattern and material — only the cut at the shoulders may be adjusted to make them level. ' +
-      'd) Apparent age of the person. ' +
-      'Output: photographic realism (real camera, not CGI). No cartoon/painting style.';
+      '1) Replace the background with uniform plain WHITE (#FFFFFF). ' +
+      '   Remove every original element from behind the person. ' +
+      '2) Apply soft, MATTE, evenly-diffused frontal studio lighting. ' +
+      '   No specular highlights or shiny spots on forehead/nose/cheeks. ' +
+      '   No directional shadows under nose, chin, or on neck. ' +
+      '3) Shoulders horizontal and level. No raised arm, no twisted torso. ' +
+      '4) Mouth closed in a relaxed neutral expression: lips touching, no teeth, no smile. ' +
+      '5) Subtle professional retouch: under-eye darkness ~50% less, fine wrinkles ~30% less, ' +
+      '   even skin tone. KEEP pores, beard, moles, freckles, scars, glasses. ' +
+      '   No airbrushed / plastic / CGI look — must read as a real un-edited camera photo. ' +
+      'KEEP UNCHANGED: face geometry, hair color/style, clothing color/material, apparent age.';
     // Specialised image-generation model; native image output.
     // Try preview name first (older, often more permissive), fall back to prod name if 404.
     const candidateModels = ['gemini-2.5-flash-image-preview', 'gemini-2.5-flash-image'];
@@ -1375,9 +1363,35 @@ async function aiCleanBg() {
   let po = showProcessing('замена фона через Gemini');
   po.step('1/4: пропорции исходника');
   po.substep(`найдено ${preMetrics.faceCount} лиц(о)`);
-  po.progress(0.1);
+  po.progress(0.05);
   const refMetrics = preMetrics;
   Log.info('aiCleanBg ref:', refMetrics);
+
+  // Pre-crop: до отправки в Gemini обрезаем исходник под 35:45 и нужный фрейминг.
+  // Это убирает посторонние элементы (UI скриншотов, окружение) — модель меньше
+  // отвлекается и реже отказывается ошибкой IMAGE_OTHER. Плюс ужимаем до 1024 px
+  // на длинной стороне, чтобы уменьшить токены и время ответа.
+  let sourceForAi = source;
+  try {
+    po.substep('обрезаем исходник под 35:45');
+    const preCv = await smartReframe(source, refMetrics, TYPES[gType]);
+    const MAX_DIM = 1024;
+    const longest = Math.max(preCv.width, preCv.height);
+    let sendCv = preCv;
+    if (longest > MAX_DIM) {
+      const scale = MAX_DIM / longest;
+      sendCv = document.createElement('canvas');
+      sendCv.width  = Math.round(preCv.width * scale);
+      sendCv.height = Math.round(preCv.height * scale);
+      const ox = sendCv.getContext('2d');
+      ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
+      ox.drawImage(preCv, 0, 0, sendCv.width, sendCv.height);
+    }
+    sourceForAi = sendCv.toDataURL('image/jpeg', 0.92);
+    Log.info(`aiCleanBg pre-crop: ${preCv.width}x${preCv.height} → send ${sendCv.width}x${sendCv.height}`);
+  } catch (e) {
+    Log.warn('aiCleanBg pre-crop failed, sending raw source:', e.message);
+  }
 
   po.step('2/4: Gemini заменяет фон');
   po.substep('ожидаем результат… до 30 сек');
@@ -1385,7 +1399,7 @@ async function aiCleanBg() {
   let aiUrl;
   try {
     const t0 = Date.now();
-    aiUrl = await ai.replaceBg(source);
+    aiUrl = await ai.replaceBg(sourceForAi);
     Log.info('replaceBg done in', ((Date.now()-t0)/1000).toFixed(1), 's');
   } catch (e) {
     po.remove(); Log.error('replaceBg failed:', e);
