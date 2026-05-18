@@ -519,6 +519,12 @@ class GeminiDirectBackend {
       '3) If the photo is a selfie with one shoulder raised, twisted, or an arm/elbow visible reaching toward the camera, ' +
       '   naturally relax the body into a normal, level, forward-facing portrait pose: both shoulders horizontal and even, ' +
       '   no arm visible, no stretched neck. Reconstruct the missing side of the torso plausibly with the SAME clothing. ' +
+      '4) If the mouth is open (smiling, talking, gasping), close it to a relaxed neutral expression: ' +
+      '   lips gently touching, no teeth visible, no smile. Preserve the natural shape and color of the lips. ' +
+      '5) Apply subtle, photographic skin retouch: even out skin tone unevenness, soften (do NOT remove) ' +
+      '   under-eye circles, soften deep harsh wrinkles slightly. Keep pores and natural skin texture. ' +
+      '   ALWAYS PRESERVE distinctive features: beard, eyebrows, moles, freckles, birthmarks, scars, glasses, piercings. ' +
+      '   Result must look like a real un-airbrushed photograph, not a 3D render. ' +
       'STRICT — DO NOT CHANGE: ' +
       'a) The person\'s face — keep eye spacing, nose length, chin shape, head proportions and skin tone EXACTLY as in the input (within 5%). ' +
       'b) Hair (color, style, length, fly-aways). Beard, eyebrows, moles, freckles, glasses. ' +
@@ -869,7 +875,9 @@ function drawGuides(W, H) {
   const ovalH = (t.headPctMin + t.headPctMax)/2;                     // ≈0.75
   const eyeY = 1 - (t.eyeFromBottomMin + t.eyeFromBottomMax)/2;      // from top
   const ovalCY = eyeY + (.85 - eyeY)*.25;                            // visual center between eyes and chin
-  const ovalW = ovalH * 0.73;                                         // typical head w/h ≈ 0.7–0.75
+  // Face width/height ratio ≈ 0.75. ovalH is fraction of fH, ovalW is fraction of fW.
+  // pixel ovalW = 0.75 * pixel ovalH ⇒ ovalW = 0.75 * ovalH * fH / fW = 0.75 * ovalH / aspect
+  const ovalW = Math.min(0.92, 0.75 * ovalH / t.aspect);
 
   octx.strokeStyle = oc; octx.lineWidth = 2; octx.setLineDash([6,4]);
   octx.beginPath();
@@ -896,6 +904,49 @@ function drawGuides(W, H) {
   octx.fillStyle='rgba(232,213,163,.65)'; octx.textAlign='center';
   octx.fillText(t.size, fX+fW/2, fY-7);
   octx.textAlign='left';
+
+  // Большие визуальные подсказки поверх рамки — стрелки/иконки направления
+  drawGuidanceCue(fX, fY, fW, fH);
+}
+
+/* Рисуем крупную визуальную подсказку (стрелка/символ) поверх кропа,
+   чтобы пользователю не пришлось «гадать» по мелкому тексту хинта. */
+function drawGuidanceCue(fX, fY, fW, fH) {
+  // приоритет: если есть проблема с позицией, показываем её; иначе — голова; иначе — свет
+  let cue = null;
+  if (gFs === 'far')         cue = { sym:'+', label:'БЛИЖЕ' };
+  else if (gFs === 'close')  cue = { sym:'−', label:'ДАЛЬШЕ' };
+  else if (gFs === 'center') cue = { sym:'⊕', label:'В ЦЕНТР' };
+  else if (gFs === 'none')   cue = { sym:'👤', label:'ВСТАНЬТЕ В КАДР' };
+  else if (gHs === 'tilt_l') cue = { sym:'↻', label:'НАКЛОН ВПРАВО' };
+  else if (gHs === 'tilt_r') cue = { sym:'↺', label:'НАКЛОН ВЛЕВО' };
+  else if (gHs === 'turn_l') cue = { sym:'→', label:'ПОВЕРНИТЕСЬ' };
+  else if (gHs === 'turn_r') cue = { sym:'←', label:'ПОВЕРНИТЕСЬ' };
+  else if (gHs === 'up')     cue = { sym:'↓', label:'ПОДБОРОДОК ВНИЗ' };
+  else if (gHs === 'down')   cue = { sym:'↑', label:'ПОДБОРОДОК ВВЕРХ' };
+  else if (gLs === 'dark')   cue = { sym:'☀', label:'НУЖНО СВЕТЛЕЕ' };
+  else if (gLs === 'bright') cue = { sym:'☼', label:'СЛИШКОМ ЯРКО' };
+  else if (gLs === 'uneven') cue = { sym:'⇆', label:'СВЕТ С ДВУХ СТОРОН' };
+  if (!cue) return;
+
+  // Большой символ слева от лица (или справа, если левый край узкий)
+  const symSize = Math.max(36, fW*0.18 | 0);
+  octx.save();
+  octx.font = `bold ${symSize}px sans-serif`;
+  octx.textAlign = 'center';
+  octx.textBaseline = 'middle';
+  octx.fillStyle = 'rgba(249, 115, 22, 0.95)';
+  octx.shadowColor = 'rgba(0,0,0,.7)';
+  octx.shadowBlur = 8;
+  const cx = fX + fW/2;
+  const cy = fY + fH*0.5;
+  octx.fillText(cue.sym, cx, cy);
+  // Подпись под символом
+  octx.font = `bold ${Math.max(10, fW*.045|0)}px sans-serif`;
+  octx.fillStyle = 'rgba(249, 115, 22, 1)';
+  octx.shadowBlur = 6;
+  octx.fillText(cue.label, cx, cy + symSize*0.6);
+  octx.restore();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1372,16 +1423,60 @@ async function aiCleanBg() {
   capCv.width = cW; capCv.height = cH;
   capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
   const finalUrl = await finalizeCapturedCanvas(capCv, { skipBgFill: true, skipLight: true });
-  Backup.saveFinal(finalUrl, { kind: bgCheck.ok ? 'ai-bg' : 'ai-bg-warn', type: gType, bgCheck });
 
-  if (bgCheck.ok) {
-    toast(`AI фон: OK. Лицо ±${maxDev}%, фон ${bgCheck.meanL.toFixed(0)}/255`, 'ok');
-    showPreview(finalUrl, { kind:'ai-bg' });
+  // ГОСТ-проверка финального результата: высота головы, линия глаз, фон
+  const gost = await checkGostCompliance(finalUrl);
+  Log.info('GOST check:', gost);
+
+  Backup.saveFinal(finalUrl, { kind: bgCheck.ok ? 'ai-bg' : 'ai-bg-warn', type: gType, bgCheck, gost });
+
+  const gostBadge = gost.ok
+    ? `ГОСТ ✓`
+    : `ГОСТ: ${gost.issues.length} замечание(й)`;
+
+  if (bgCheck.ok && gost.ok) {
+    toast(`AI фон: OK. Лицо ±${maxDev}%, фон ${bgCheck.meanL.toFixed(0)}/255, ${gostBadge}`, 'ok');
+    showPreview(finalUrl, { kind:'ai-bg', gost });
   } else {
-    toast(`AI фон выдал результат с замечанием: ${bgCheck.reason}. Лицо ±${maxDev}% — ок. Посмотрите.`, 'warn');
-    Log.warn('aiCleanBg shown with bg warning:', bgCheck.reason);
-    showPreview(finalUrl, { kind:'ai-bg-warn' });
+    const issues = [];
+    if (!bgCheck.ok) issues.push(`фон: ${bgCheck.reason}`);
+    if (!gost.ok)    issues.push(...gost.issues);
+    toast(`AI фон с замечаниями: ${issues.join('; ')}. Лицо ±${maxDev}% — ок. Посмотрите.`, 'warn');
+    Log.warn('aiCleanBg soft-fail:', issues.join('; '));
+    showPreview(finalUrl, { kind:'ai-bg-warn', gost });
   }
+}
+
+/* ГОСТ-проверка для итогового кадра: высота головы и линия глаз.
+   Запускается через MediaPipe на финальной картинке 35×45 / 30×40 @ 300 DPI.
+   Возвращает {ok, issues:[строки]}. Только мягкие замечания — пользователь решает. */
+async function checkGostCompliance(dataUrl) {
+  const t = TYPES[gType];
+  const m = await measureFaceMetrics(dataUrl);
+  if (!m) return { ok:false, issues:['лицо не найдено для проверки ГОСТ'] };
+  const img = await loadImage(dataUrl);
+  // MediaPipe возвращает bbox в относительных координатах (0..1). Высчитаем:
+  //   headPct = (chin - crown), но у нас есть только bbox через measureFaceMetrics.
+  // measureFaceMetrics не возвращает сам bbox, давайте получим его быстро отдельно.
+  // Используем уже посчитанный e2c (от линии глаз до подбородка bbox) и
+  //   восстановим bbox.height ≈ e2c / (примерно 0.62 — отношение eye-to-chin к высоте лица)
+  //   для приблизительной оценки.
+  // Лучше: дополним measureFaceMetrics, чтобы возвращал bbox.height/yCenter.
+  const issues = [];
+  // Если у нас есть bbox, проверяем; иначе skip — этот случай защищён в коде.
+  if (m.bboxHeight != null) {
+    const headPct = m.bboxHeight;  // bbox.height ≈ доля лица в кадре
+    if (headPct < t.headPctMin - 0.03) issues.push(`голова мала: ${(headPct*100).toFixed(0)}% от высоты (нужно ${(t.headPctMin*100).toFixed(0)}–${(t.headPctMax*100).toFixed(0)}%)`);
+    if (headPct > t.headPctMax + 0.03) issues.push(`голова велика: ${(headPct*100).toFixed(0)}% от высоты (нужно ${(t.headPctMin*100).toFixed(0)}–${(t.headPctMax*100).toFixed(0)}%)`);
+  }
+  if (m.eyeFromBottom != null) {
+    const eb = m.eyeFromBottom;
+    if (eb < t.eyeFromBottomMin - 0.03) issues.push(`глаза низко: ${(eb*100).toFixed(0)}% от низа (нужно ${(t.eyeFromBottomMin*100).toFixed(0)}–${(t.eyeFromBottomMax*100).toFixed(0)}%)`);
+    if (eb > t.eyeFromBottomMax + 0.03) issues.push(`глаза высоко: ${(eb*100).toFixed(0)}% от низа (нужно ${(t.eyeFromBottomMin*100).toFixed(0)}–${(t.eyeFromBottomMax*100).toFixed(0)}%)`);
+  }
+  if (Math.abs(m.roll) > 5)  issues.push(`наклон головы ${m.roll.toFixed(0)}° (нужно ≤ 5°)`);
+  if (Math.abs(m.yaw)  > 0.08) issues.push(`поворот головы (yaw=${(m.yaw*100).toFixed(0)}% — нужно ≤ 8%)`);
+  return { ok: issues.length === 0, issues, metrics: m };
 }
 
 /* Проверка фона: сэмплируем ТОЛЬКО верхнюю полосу (~15% высоты).
@@ -1643,7 +1738,12 @@ async function measureFaceMetrics(dataUrl) {
       const n2m = mouth.y - nose.y;
       const yaw = (nose.x - (re.x + le.x)/2) / bb.width;
       const roll = Math.atan2(le.y-re.y, le.x-re.x) * 180/Math.PI;
-      settle({ iod, e2c, n2m, yaw, roll, faceCount });
+      // Доп. метрики для ГОСТ-чека: высота bbox как доля кадра (~доля головы),
+      // и линия глаз от низа кадра (1 - eyeMidY).
+      // bbox не покрывает темя (волосы), поэтому headPct ≈ bb.height * 1.18 эмпирически.
+      const bboxHeight = Math.min(1, bb.height * 1.18);
+      const eyeFromBottom = 1 - eyeMidY;
+      settle({ iod, e2c, n2m, yaw, roll, faceCount, bboxHeight, eyeFromBottom });
     };
     try { window._fd.onResults(once); } catch (e) { return settle(null); }
     const timeout = setTimeout(() => settle(null), 3000);
