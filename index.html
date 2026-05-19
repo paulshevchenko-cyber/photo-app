@@ -1119,7 +1119,7 @@ async function doCapture() {
   po.substep('масштабируем до 300 DPI, мягкая коррекция света');
   po.progress(0.4);
   // Flood-fill отключён по умолчанию — даёт артефакты на сложном фоне.
-  // Для удаления фона пользователь нажимает «🪄 AI фон» в preview.
+  // Для удаления фона/ретуши пользователь нажимает «🪄 AI обработка» в preview.
   let url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
   po.progress(0.7);
 
@@ -1326,22 +1326,32 @@ function showPreview(url, opts) {
   const isAiResult = opts.kind === 'ai-bg' || opts.kind === 'ai-bg-warn' || opts.kind === 'ai-ok';
   const badge = opts.kind === 'ai-ok'     ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
               : opts.kind === 'ai-fb'     ? '<div class="prev-badge warn">⚠ Fallback: лучший кадр</div>'
-              : opts.kind === 'ai-bg'     ? '<div class="prev-badge">✓ AI фон заменён</div>'
-              : opts.kind === 'ai-bg-warn'? '<div class="prev-badge warn">⚠ AI фон с замечанием</div>'
+              : opts.kind === 'ai-bg'     ? '<div class="prev-badge">✓ AI обработка готова</div>'
+              : opts.kind === 'ai-bg-warn'? '<div class="prev-badge warn">⚠ AI обработка с замечанием</div>'
               : '<div class="prev-badge">✓ Фото готово</div>';
   vfEl.insertAdjacentHTML('beforeend',
     `<div class="prev-wrap"><img src="${url}"/>${badge}</div>`);
   // Если уже есть AI-результат, основная кнопка — «🔁 AI ещё попытка» (re-run на исходнике).
-  // Иначе — «🪄 AI фон» (первая попытка).
-  const aiBtnLabel = isAiResult ? '🔁 AI ещё попытка' : '🪄 AI фон';
+  // Иначе — «🪄 AI обработка» (первая попытка).
+  const aiBtnLabel = isAiResult ? '🔁 AI ещё попытка' : '🪄 AI обработка';
+  const maxCopies = maxCopiesForPaper(gPaper, TYPES[gType]);
+  // Опции количества копий: 2, 4, 6, 8 + (для A4) 10, 12. Дефолт = max
+  const copyOpts = (gPaper === 'a4' ? [2,4,6,8,10,12] : [2,4,6,8]).filter(n => n <= maxCopies);
+  if (!gPrintCount || gPrintCount > maxCopies) gPrintCount = maxCopies;
+  const copiesBtns = copyOpts.map(n =>
+    `<button class="${gPrintCount===n?'on':''}" onclick="setCopies(${n})">${n}</button>`).join('');
   ctrlEl.innerHTML = `
     <button class="abtn" onclick="retake()">↩ Переснять</button>
-    <button class="abtn" onclick="aiCleanBg()" title="Запросить новый вариант AI">${aiBtnLabel}</button>
+    <button class="abtn" onclick="aiCleanBg()" title="AI: фон, свет, ретушь, фрейминг">${aiBtnLabel}</button>
     <div class="paper-toggle">
       <button class="${gPaper==='10x15'?'on':''}" onclick="setPaper('10x15')">10×15</button>
       <button class="${gPaper==='a4'?'on':''}"    onclick="setPaper('a4')">A4</button>
     </div>
-    <button class="abtn"   onclick="printSheet('${gLastPhotoUrl}')">⎙ Лист</button>
+    <div class="paper-toggle" style="flex-basis:100%;justify-content:center;gap:4px">
+      <span style="font-size:9px;color:rgba(232,213,163,.5);letter-spacing:.08em;padding:0 4px">КОПИЙ:</span>
+      ${copiesBtns}
+    </div>
+    <button class="abtn"   onclick="printSheet('${gLastPhotoUrl}')">⎙ Лист (${gPrintCount})</button>
     <button class="abtn p" onclick="dlPhoto('${gLastPhotoUrl}')">↓ JPEG</button>`;
   document.getElementById('sbar').style.opacity = '.35';
   gLastPhotoUrl = url;
@@ -1350,9 +1360,22 @@ function showPreview(url, opts) {
   if (opts.kind === 'single') gLastSourceUrl = url;
 }
 let gLastPhotoUrl = null;
-let gLastSourceUrl = null;  // фото ДО AI фона — для повторной попытки и сравнения
+let gLastSourceUrl = null;  // фото ДО AI обработки — для повторной попытки и сравнения
+let gPrintCount = null;     // null = авто (max на лист)
 
-function setPaper(p) { gPaper = p; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
+function setPaper(p) { gPaper = p; gPrintCount = null; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
+function setCopies(n) { gPrintCount = n; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
+
+/* Сколько фото 35×45 (или 30×40) физически помещается на лист с разумными отступами */
+function maxCopiesForPaper(paper, typeSpec) {
+  const photoW = typeSpec.wMM, photoH = typeSpec.hMM;
+  let pageW, pageH, padding, gap;
+  if (paper === 'a4') { pageW = 210; pageH = 297; padding = 8; gap = 3; }
+  else                { pageW = 152; pageH = 102; padding = 4; gap = 3; }
+  const cols = Math.max(1, Math.floor((pageW - 2*padding + gap) / (photoW + gap)));
+  const rows = Math.max(1, Math.floor((pageH - 2*padding + gap) / (photoH + gap)));
+  return cols * rows;
+}
 
 /* ═══════════════════════════════════════════════════════
    AI background replacement (Gemini) with two-stage verify:
@@ -1511,14 +1534,14 @@ async function aiCleanBg() {
     : `лицо ±${maxDev}%`;
 
   if (bgCheck.ok && gost.ok && !personSoftWarn) {
-    toast(`AI фон: OK. ${personBadge}, фон ${bgCheck.meanL.toFixed(0)}/255, ${gostBadge}`, 'ok');
+    toast(`AI обработка: OK. ${personBadge}, фон ${bgCheck.meanL.toFixed(0)}/255, ${gostBadge}`, 'ok');
     showPreview(finalUrl, { kind:'ai-bg', gost, maxDevPct });
   } else {
     const issues = [];
     if (personSoftWarn) issues.push(`лицо изменилось на ${maxDev}% (ретушь/закрытие рта)`);
     if (!bgCheck.ok)    issues.push(`фон: ${bgCheck.reason}`);
     if (!gost.ok)       issues.push(...gost.issues);
-    toast(`AI фон с замечаниями: ${issues.join('; ')}. Нажмите «🔁 AI ещё» для другой попытки.`, 'warn');
+    toast(`AI обработка с замечаниями: ${issues.join('; ')}. Нажмите «🔁 AI ещё» для другой попытки.`, 'warn');
     Log.warn('aiCleanBg soft-fail:', issues.join('; '));
     showPreview(finalUrl, { kind:'ai-bg-warn', gost, maxDevPct });
   }
@@ -1662,7 +1685,26 @@ function printSheet(url) {
     cols = Math.floor((pageW - 2*padding) / (photoW + 3));
     rows = Math.floor((pageH - 2*padding) / (photoH + 3));
   }
-  const total = cols * rows;
+  const maxTotal = cols * rows;
+  // Пользователь может выбрать меньше копий чем влезает — рисуем cols×rows ячеек,
+  // но первые N с фото, остальные пустые (или просто рендерим только N подряд).
+  const wantedTotal = (gPrintCount && gPrintCount > 0 && gPrintCount <= maxTotal) ? gPrintCount : maxTotal;
+  // Если просили меньше — лучше уплотнить раскладку: чтобы 4 копии не торчали в углу,
+  // пересчитаем cols/rows под wantedTotal.
+  if (wantedTotal < maxTotal) {
+    // Пробуем найти cols × rows такие, чтобы cols*rows >= wantedTotal и помещалось на лист
+    let bestCols = cols, bestRows = rows;
+    for (let c = 1; c <= cols; c++) {
+      const r = Math.ceil(wantedTotal / c);
+      if (r > rows) continue;
+      // Считаем "плотность" — насколько ровно укладывается
+      if (c * r >= wantedTotal && c * r <= bestCols * bestRows) {
+        bestCols = c; bestRows = r;
+      }
+    }
+    cols = bestCols; rows = bestRows;
+  }
+  const total = Math.min(wantedTotal, cols * rows);
 
   const cells = Array.from({ length: total }, () => `
     <div class="cell">
@@ -2097,7 +2139,7 @@ function renderCtrl() {
       ctrlEl.innerHTML = `
         <button class="icobtn" onclick="flipCam()" title="Поменять камеру">⇄</button>
         <button class="cbtn child" id="capBtn" onclick="doCapture()"><div class="ci"></div><span class="cn">5×</span></button>
-        ${gPortraitCapable ? `<button class="icobtn ${gPortrait?'on':''}" onclick="togglePortrait()" title="Портрет">📷⊕</button>` : `<button class="icobtn" onclick="toggleBg()" id="bgBtn" title="AI фон">🪄</button>`}
+        ${gPortraitCapable ? `<button class="icobtn ${gPortrait?'on':''}" onclick="togglePortrait()" title="Портрет">📷⊕</button>` : `<button class="icobtn" onclick="toggleBg()" id="bgBtn" title="AI фон ImgLy">🪄</button>`}
       `;
     } else {
       ctrlEl.innerHTML = `
@@ -2110,7 +2152,7 @@ function renderCtrl() {
       <button class="icobtn" onclick="fileSingle.click()" title="Из галереи">📁</button>
       <button class="cbtn" id="capBtn" onclick="doCapture()"><div class="ci"></div></button>
       ${gPortraitCapable ? `<button class="icobtn ${gPortrait?'on':''}" onclick="togglePortrait()" title="Портрет">📷⊕</button>` : ''}
-      <button class="icobtn ${gBgRemove?'on':''}" id="bgBtn" onclick="toggleBg()" title="AI фон">🪄</button>`;
+      <button class="icobtn ${gBgRemove?'on':''}" id="bgBtn" onclick="toggleBg()" title="AI фон ImgLy">🪄</button>`;
   }
 }
 
