@@ -704,8 +704,11 @@ async function startCamera() {
 
   let stream;
   try {
+    // Запрашиваем максимально доступное разрешение. Это влияет на размер картинки,
+    // которую мы потом отдаём в Gemini: raw-источник в aiCleanBg идёт от videoWidth/Height
+    // без даунсемпла до 413×531. Чем больше пикселей с камеры, тем больше деталей видит AI.
     stream = await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode:gFacing, width:{ideal:1280}, height:{ideal:720} },
+      video:{ facingMode:gFacing, width:{ ideal:1920, max:4096 }, height:{ ideal:1080, max:2160 } },
       audio:false
     });
   } catch (e1) {
@@ -720,6 +723,27 @@ async function startCamera() {
 
   gStream = stream;
   vid.srcObject = stream;
+
+  // После получения стрима спрашиваем track.getCapabilities() — некоторые камеры (особенно
+  // на macOS / встроенные FaceTime / внешние USB) умеют отдавать больше, чем 1920×1080,
+  // если запросить явно. Если max выше уже выданного — применяем повышенный constraint.
+  try {
+    const track = stream.getVideoTracks()[0];
+    const caps = track.getCapabilities?.() || {};
+    const settings = track.getSettings?.() || {};
+    const curW = settings.width || 0;
+    if (caps.width?.max && caps.width.max > curW) {
+      const upgrade = { width: { ideal: caps.width.max } };
+      if (caps.height?.max) upgrade.height = { ideal: caps.height.max };
+      await track.applyConstraints(upgrade);
+      const s2 = track.getSettings?.() || {};
+      Log.info(`camera caps upgrade: ${curW}x${settings.height||'?'} → requested ${caps.width.max}x${caps.height?.max||'?'}, got ${s2.width||'?'}x${s2.height||'?'}`);
+    } else {
+      Log.info(`camera caps: max=${caps.width?.max||'?'}x${caps.height?.max||'?'}, settled=${curW}x${settings.height||'?'}`);
+    }
+  } catch (e) {
+    Log.warn('camera capability upgrade failed:', e.message||e);
+  }
 
   detectPortraitCapability(stream);
 
@@ -749,6 +773,9 @@ function onVideoReady() {
   if (gVideoReady) return;
   gVideoReady = true;
   clearTimeout(gPollTimer);
+  // Логируем фактическое разрешение видео-стрима — это и есть та высота, с которой raw
+  // капчур уйдёт в AI (без даунсемпла до 413×531).
+  Log.info(`camera stream resolution: ${vid.videoWidth}x${vid.videoHeight}`);
   setHint(gMode === 'child' ? 'Готовы снять серию' : 'Совместите лицо с овалом');
   startOverlay();
   scheduleAnalysis(800);
@@ -1115,6 +1142,11 @@ async function doCapture() {
     capCtx.drawImage(vid, sx, sy, cW, cH, 0, 0, cW, cH);
   }
 
+  // Сохраняем raw-источник ДО finalizeCapturedCanvas (тот сожмёт до 413×531).
+  // Это та картинка, которую увидит Gemini в aiCleanBg.
+  gLastRawSourceUrl = capCv.toDataURL('image/jpeg', 0.95);
+  Log.info(`doCapture raw: ${cW}x${cH} (video=${vw}x${vh})`);
+
   po.step('Постобработка');
   po.substep('масштабируем до 300 DPI, мягкая коррекция света');
   po.progress(0.4);
@@ -1361,6 +1393,10 @@ function showPreview(url, opts) {
 }
 let gLastPhotoUrl = null;
 let gLastSourceUrl = null;  // фото ДО AI обработки — для повторной попытки и сравнения
+// Raw-источник для AI: исходный кадр, кропнутый ТОЛЬКО под аспект 35:45, без даунсемпла до 413×531.
+// Чтобы Gemini видел исходную детализацию (videoWidth × videoHeight или полный размер файла),
+// а не и без того ужатую финалку. Заполняется в doCapture / ingestSingleFile.
+let gLastRawSourceUrl = null;
 let gPrintCount = null;     // null = авто (max на лист)
 
 function setPaper(p) { gPaper = p; gPrintCount = null; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
@@ -1389,8 +1425,11 @@ function maxCopiesForPaper(paper, typeSpec) {
 async function aiCleanBg() {
   const ai = makeAiBackend();
   if (!ai.configured) { toast('Введите API-ключ Gemini в ⚙ настройках', 'warn'); openSettings(); return; }
-  const source = gLastSourceUrl || gLastPhotoUrl;
+  // Источник для AI — raw cropped кадр (без ресайза до 413×531). Финалка остаётся фолбэком
+  // на случай, если raw не был сохранён (например, фото восстановлено из Backup в новой сессии).
+  const source = gLastRawSourceUrl || gLastSourceUrl || gLastPhotoUrl;
   if (!source) { toast('Нет исходного фото', 'err'); return; }
+  const usingRaw = !!gLastRawSourceUrl;
 
   // Pre-flight: считаем лица в кадре отдельно от processing UI
   const preMetrics = await measureFaceMetrics(source);
@@ -1417,10 +1456,14 @@ async function aiCleanBg() {
   // Перед отправкой в Gemini ужимаем картинку до 1024 px на длинной стороне.
   // НЕ обрезаем — AI нужен контекст вокруг лица для понимания фона и пропорций.
   // Slim resize: меньше токенов и времени, но AI видит окружение.
+  // Теперь source = raw cropped (например 1920×2469 с камеры или 3024×3888 из 4K-файла),
+  // поэтому MAX_DIM=1024 реально работает, а не остаётся мёртвым кодом для 413×531.
   let sourceForAi = source;
+  let rawW = 0, rawH = 0, aiInW = 0, aiInH = 0;
   try {
     po.substep('готовим картинку для AI');
     const srcImg = await loadImage(source);
+    rawW = srcImg.width; rawH = srcImg.height;
     const MAX_DIM = 1024;
     const longest = Math.max(srcImg.width, srcImg.height);
     if (longest > MAX_DIM) {
@@ -1432,9 +1475,11 @@ async function aiCleanBg() {
       ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
       ox.drawImage(srcImg, 0, 0, sendCv.width, sendCv.height);
       sourceForAi = sendCv.toDataURL('image/jpeg', 0.92);
-      Log.info(`aiCleanBg resize: ${srcImg.width}x${srcImg.height} → ${sendCv.width}x${sendCv.height}`);
+      aiInW = sendCv.width; aiInH = sendCv.height;
+      Log.info(`aiCleanBg resize: ${srcImg.width}x${srcImg.height} → ${sendCv.width}x${sendCv.height} (source=${usingRaw?'raw':'finalized'})`);
     } else {
-      Log.info(`aiCleanBg: source ${srcImg.width}x${srcImg.height} fits MAX_DIM, no resize`);
+      aiInW = srcImg.width; aiInH = srcImg.height;
+      Log.info(`aiCleanBg: source ${srcImg.width}x${srcImg.height} fits MAX_DIM, no resize (source=${usingRaw?'raw':'finalized'})`);
     }
   } catch (e) {
     Log.warn('aiCleanBg resize failed, sending raw source:', e.message);
@@ -1444,10 +1489,16 @@ async function aiCleanBg() {
   po.substep('ожидаем результат… до 30 сек');
   po.progress(0.3);
   let aiUrl;
+  let aiOutW = 0, aiOutH = 0;
   try {
     const t0 = Date.now();
     aiUrl = await ai.replaceBg(sourceForAi);
     Log.info('replaceBg done in', ((Date.now()-t0)/1000).toFixed(1), 's');
+    try {
+      const aiImg = await loadImage(aiUrl);
+      aiOutW = aiImg.width; aiOutH = aiImg.height;
+      Log.info(`aiCleanBg AI output: ${aiOutW}x${aiOutH}`);
+    } catch (e) { Log.warn('AI output size probe failed:', e.message||e); }
   } catch (e) {
     po.remove(); Log.error('replaceBg failed:', e);
     toast('Gemini: ' + (e.message||e), 'err');
@@ -1521,6 +1572,14 @@ async function aiCleanBg() {
   capCv.width = reframedCv.width; capCv.height = reframedCv.height;
   capCtx.drawImage(reframedCv, 0, 0);
   const finalUrl = await finalizeCapturedCanvas(capCv, { skipBgFill: true, skipLight: true });
+
+  // Сводный trace: raw → AI input → AI output → finalized.
+  // Раньше всё было ~413×531 на всех шагах, потому что финализация шла ДО AI;
+  // теперь raw — это полноценный кадр с камеры/файла.
+  try {
+    const finImg = await loadImage(finalUrl);
+    Log.info(`aiCleanBg trace: raw=${rawW}x${rawH} → AI input=${aiInW}x${aiInH} → AI output=${aiOutW}x${aiOutH} → finalized=${finImg.width}x${finImg.height}`);
+  } catch (e) { Log.warn('final size probe failed:', e.message||e); }
 
   // ГОСТ-проверка финального результата: высота головы, линия глаз, фон
   const gost = await checkGostCompliance(finalUrl);
@@ -1766,6 +1825,11 @@ async function ingestSingleFile(file) {
     const sx = ((sw-cW)/2)|0, sy = ((sh-cH)/2)|0;
     capCv.width = cW; capCv.height = cH;
     capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
+
+    // Raw для AI: исходник, кропнутый под аспект 35:45, без ресайза до 413×531.
+    // Для 4K-файла это, например, 3024×3888 → AI получает полную детализацию.
+    gLastRawSourceUrl = capCv.toDataURL('image/jpeg', 0.95);
+    Log.info(`ingestSingleFile raw: ${cW}x${cH} (source=${sw}x${sh})`);
 
     po.step('Постобработка');
     po.substep('масштаб до 300 DPI, свет');
@@ -2194,6 +2258,7 @@ function toggleBg() {
 
 function retake() {
   gCaptured = false;
+  gLastRawSourceUrl = null;
   vid.style.display=''; ov.style.display=''; hintEl.style.display='';
   vfEl.querySelector('.prev-wrap')?.remove();
   vfEl.querySelectorAll('.cam-err').forEach(e => e.remove());
