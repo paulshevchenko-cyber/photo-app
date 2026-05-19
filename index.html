@@ -1354,6 +1354,13 @@ function u8ToDataUrl(u8) {
 
 function showPreview(url, opts) {
   vid.style.display='none'; ov.style.display='none'; hintEl.style.display='none';
+  // Защита от гонки: некоторые движки/расширения могут переустановить style
+  // (или прежний overlay-loop успевает дорисовать) между нашим присваиванием
+  // и реальным отображением. Дублируем после следующего кадра.
+  requestAnimationFrame(() => {
+    ov.style.display = 'none';
+    if (octx) octx.clearRect(0, 0, ov.width, ov.height);
+  });
   vfEl.querySelectorAll('.prev-wrap,.bstrip').forEach(e => e.remove());
   const isAiResult = opts.kind === 'ai-bg' || opts.kind === 'ai-bg-warn' || opts.kind === 'ai-ok';
   const badge = opts.kind === 'ai-ok'     ? '<div class="prev-badge">✓ AI-композит (' + (opts.src||'') + ')</div>'
