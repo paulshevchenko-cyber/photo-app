@@ -1631,13 +1631,15 @@ async function aiCleanBg() {
 /* Smart-reframe: приводим кадр к ГОСТ. Используем crownYRel и chinYRel
    из MediaPipe для точного позиционирования головы:
    - голова (макушка→подбородок) занимает 75% высоты выхода
-   - 5% воздуха над макушкой (важно: чтобы волосы не обрезались)
+   - 5 мм воздуха над макушкой (абсолютная величина, ГОСТ/МВД) →
+     в долях: 5/45 = 11.1% для 35×45, 5/40 = 12.5% для 30×40
    - линия глаз ~60% от низа
    - центр лица по горизонтали
    Если кадр выходит за границы источника — добавляем белые поля. */
 async function smartReframe(dataUrl, metrics, typeSpec) {
-  const TARGET_HEAD_PCT  = 0.70;   // голова (от макушки до подбородка) — 70% выхода
-  const CROWN_FROM_TOP   = 0.08;   // 8% воздуха над макушкой
+  const TARGET_HEAD_PCT  = 0.75;                          // голова — 75% выхода (середина диапазона 70-80%)
+  const CROWN_TOP_MM     = 5;                             // 5 мм над макушкой по ГОСТ
+  const CROWN_FROM_TOP   = CROWN_TOP_MM / typeSpec.hMM;   // доля от выхода: 5/45 ≈ 0.111 или 5/40 = 0.125
   const TARGET_EYE_FROM_BOTTOM = 0.63;  // линия глаз 63% от низа
 
   const img = await loadImage(dataUrl);
@@ -1682,8 +1684,12 @@ async function smartReframe(dataUrl, metrics, typeSpec) {
   const sH = Math.min(H - sY, cropH - padT - padB);
   ox.drawImage(img, sX, sY, sW, sH, padL, padT, sW, sH);
 
+  // out crown / out head — инвариант формулы: макушка попадает на CROWN_FROM_TOP * cropH
+  // от верха кропа, голова занимает headH_src/cropH = TARGET_HEAD_PCT. Эти значения
+  // не зависят от источника и нужны в логе, чтобы не путать src-координаты с выходными.
   Log.info(`smartReframe: src ${W}x${H}, crop ${Math.round(cropW)}x${Math.round(cropH)}, ` +
-    `face cx=${(metrics.bboxCenterX*100).toFixed(0)}% crownY=${((crownY_src/H)*100).toFixed(0)}% chinY=${((chinY_src/H)*100).toFixed(0)}%, ` +
+    `face cx=${(metrics.bboxCenterX*100).toFixed(0)}% src crownY=${((crownY_src/H)*100).toFixed(0)}% chinY=${((chinY_src/H)*100).toFixed(0)}%, ` +
+    `out crown=${(CROWN_FROM_TOP*100).toFixed(1)}% head=${(TARGET_HEAD_PCT*100).toFixed(0)}%, ` +
     `pads L${padL.toFixed(0)} T${padT.toFixed(0)} R${padR.toFixed(0)} B${padB.toFixed(0)}`);
   return out;
 }
@@ -1714,6 +1720,14 @@ async function checkGostCompliance(dataUrl) {
     const eb = m.eyeFromBottom;
     if (eb < t.eyeFromBottomMin - 0.03) issues.push(`глаза низко: ${(eb*100).toFixed(0)}% от низа (нужно ${(t.eyeFromBottomMin*100).toFixed(0)}–${(t.eyeFromBottomMax*100).toFixed(0)}%)`);
     if (eb > t.eyeFromBottomMax + 0.03) issues.push(`глаза высоко: ${(eb*100).toFixed(0)}% от низа (нужно ${(t.eyeFromBottomMin*100).toFixed(0)}–${(t.eyeFromBottomMax*100).toFixed(0)}%)`);
+  }
+  // Soft-проверка верхнего поля над макушкой: ГОСТ требует 5 мм. Допуск ±1 мм
+  // ловит сильно недопозиционированный фрейминг (раньше с CROWN_FROM_TOP=0.08 для 45 мм
+  // выходило 3.6 мм — ниже нижней границы). crownYRel — доля от верха финальной картинки.
+  if (m.crownYRel != null) {
+    const topMarginMM = m.crownYRel * t.hMM;
+    if (topMarginMM < 4) issues.push(`над макушкой ${topMarginMM.toFixed(1)} мм — мало (нужно 5±1 мм)`);
+    if (topMarginMM > 6) issues.push(`над макушкой ${topMarginMM.toFixed(1)} мм — много (нужно 5±1 мм)`);
   }
   if (Math.abs(m.roll) > 5)  issues.push(`наклон головы ${m.roll.toFixed(0)}° (нужно ≤ 5°)`);
   if (Math.abs(m.yaw)  > 0.08) issues.push(`поворот головы (yaw=${(m.yaw*100).toFixed(0)}% — нужно ≤ 8%)`);
