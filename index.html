@@ -1638,7 +1638,11 @@ async function aiCleanBg() {
    Если кадр выходит за границы источника — добавляем белые поля. */
 async function smartReframe(dataUrl, metrics, typeSpec) {
   const TARGET_HEAD_PCT  = 0.75;                          // голова — 75% выхода (середина диапазона 70-80%)
-  const CROWN_TOP_MM     = 5;                             // 5 мм над макушкой по ГОСТ
+  // 5 мм над макушкой — взято из требований к 35×45 (паспорт/виза, МВД РФ).
+  // Для 30×40 (военный билет) формула экстраполируется: 5/40 = 12.5% — это наш
+  // разумный default, отдельно по спецификации воен.билета не сверено.
+  // Если найдём фактический норматив для 30×40 — заведём type-specific override.
+  const CROWN_TOP_MM     = 5;
   const CROWN_FROM_TOP   = CROWN_TOP_MM / typeSpec.hMM;   // доля от выхода: 5/45 ≈ 0.111 или 5/40 = 0.125
   const TARGET_EYE_FROM_BOTTOM = 0.63;  // линия глаз 63% от низа
 
