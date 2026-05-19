@@ -1366,12 +1366,14 @@ let gPrintCount = null;     // null = авто (max на лист)
 function setPaper(p) { gPaper = p; gPrintCount = null; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
 function setCopies(n) { gPrintCount = n; if (gLastPhotoUrl) showPreview(gLastPhotoUrl, {kind:'single'}); }
 
-/* Сколько фото 35×45 (или 30×40) физически помещается на лист с разумными отступами */
+/* Сколько фото 35×45 (или 30×40) физически помещается на лист.
+   На 10×15: 4×2 = 8 копий 35×45 (с минимальными отступами под обрезку).
+   На A4: до 4×3 = 12 копий. */
 function maxCopiesForPaper(paper, typeSpec) {
   const photoW = typeSpec.wMM, photoH = typeSpec.hMM;
   let pageW, pageH, padding, gap;
-  if (paper === 'a4') { pageW = 210; pageH = 297; padding = 8; gap = 3; }
-  else                { pageW = 152; pageH = 102; padding = 4; gap = 3; }
+  if (paper === 'a4') { pageW = 210; pageH = 297; padding = 6; gap = 3; }
+  else                { pageW = 152; pageH = 102; padding = 2; gap = 2; }
   const cols = Math.max(1, Math.floor((pageW - 2*padding + gap) / (photoW + gap)));
   const rows = Math.max(1, Math.floor((pageH - 2*padding + gap) / (photoH + gap)));
   return cols * rows;
@@ -1547,38 +1549,42 @@ async function aiCleanBg() {
   }
 }
 
-/* Smart-reframe: AI часто отдаёт фото с лицом не по центру и неправильной
-   высотой головы. Используя точные координаты лица (от MediaPipe), мы
-   переобрезаем результат под ГОСТ: лицо по центру X, голова 75% высоты,
-   глаза 60% от низа. Если AI-картинка меньше нужного кропа в какой-то
-   стороне — добавляем белые поля. */
+/* Smart-reframe: приводим кадр к ГОСТ. Используем crownYRel и chinYRel
+   из MediaPipe для точного позиционирования головы:
+   - голова (макушка→подбородок) занимает 75% высоты выхода
+   - 5% воздуха над макушкой (важно: чтобы волосы не обрезались)
+   - линия глаз ~60% от низа
+   - центр лица по горизонтали
+   Если кадр выходит за границы источника — добавляем белые поля. */
 async function smartReframe(dataUrl, metrics, typeSpec) {
-  const TARGET_HEAD_PCT = 0.75;          // голова занимает 75% высоты выхода
-  const TARGET_EYE_FROM_BOTTOM = 0.63;   // середина диапазона 56-70%
-  const HAIR_MULT = 1.18;                // bbox без волос → real head height
+  const TARGET_HEAD_PCT  = 0.70;   // голова (от макушки до подбородка) — 70% выхода
+  const CROWN_FROM_TOP   = 0.08;   // 8% воздуха над макушкой
+  const TARGET_EYE_FROM_BOTTOM = 0.63;  // линия глаз 63% от низа
 
   const img = await loadImage(dataUrl);
   const W = img.width, H = img.height;
-  const aspect = typeSpec.aspect;        // 35/45 ≈ 0.778
+  const aspect = typeSpec.aspect;
 
-  // Реальная высота головы в пикселях источника (с поправкой на волосы)
-  const headH_src = metrics.bboxHeight * H;  // bboxHeight уже умножен на 1.18 в measureFaceMetrics
-  // Линия глаз в пикселях источника
-  const eyeY_src = metrics.eyeYRel * H;
-  // Центр лица в пикселях источника
+  // Координаты ключевых точек в пикселях источника
+  const crownY_src = (metrics.crownYRel != null ? metrics.crownYRel : (metrics.bboxCenterY - metrics.headHeightRel/2)) * H;
+  const chinY_src  = (metrics.chinYRel  != null ? metrics.chinYRel  : (metrics.bboxCenterY + metrics.headHeightRel/2)) * H;
+  const headH_src  = chinY_src - crownY_src;
+  const eyeY_src   = metrics.eyeYRel * H;
   const faceCX_src = metrics.bboxCenterX * W;
-  // Поскольку bbox не включает волосы, реальный «центр головы» немного выше bboxCenterY.
-  // Для smart-reframe нам важен eye Y (он точный) — от него и считаем.
 
-  // Размер кропа: голова должна стать TARGET_HEAD_PCT от высоты → cropH = headH_src / TARGET_HEAD_PCT
+  // Считаем высоту кропа так, чтобы голова занимала TARGET_HEAD_PCT
   let cropH = headH_src / TARGET_HEAD_PCT;
   let cropW = cropH * aspect;
 
-  // Координаты кропа: face center по горизонтали, eye Y на (1-TARGET_EYE_FROM_BOTTOM) от верха кропа
+  // cropY такой, что crownY попадает на CROWN_FROM_TOP * cropH от верха кропа
+  let cropY = crownY_src - CROWN_FROM_TOP * cropH;
+  // cropX такой, что лицо строго по центру
   let cropX = faceCX_src - cropW / 2;
-  let cropY = eyeY_src - (1 - TARGET_EYE_FROM_BOTTOM) * cropH;
 
-  // Если кроп выходит за границы — определяем сколько белых полей нужно
+  // Проверка по линии глаз: если eyeY оказался слишком высоко/низко, скорректируем
+  // (доминирует требование "5% над макушкой" — линия глаз второстепенна)
+
+  // Поля для белой заливки, если crop выходит за источник
   const padL = Math.max(0, -cropX);
   const padT = Math.max(0, -cropY);
   const padR = Math.max(0, (cropX + cropW) - W);
@@ -1588,20 +1594,17 @@ async function smartReframe(dataUrl, metrics, typeSpec) {
   out.width  = Math.round(cropW);
   out.height = Math.round(cropH);
   const ox = out.getContext('2d');
-  // Заливаем белым (фон) на случай, если будут поля
   ox.fillStyle = '#FFFFFF';
   ox.fillRect(0, 0, out.width, out.height);
 
-  // Источник: clamp к границам картинки
   const sX = Math.max(0, cropX);
   const sY = Math.max(0, cropY);
   const sW = Math.min(W - sX, cropW - padL - padR);
   const sH = Math.min(H - sY, cropH - padT - padB);
-  // Дестинация: смещение на padL/padT внутри out
   ox.drawImage(img, sX, sY, sW, sH, padL, padT, sW, sH);
 
   Log.info(`smartReframe: src ${W}x${H}, crop ${Math.round(cropW)}x${Math.round(cropH)}, ` +
-    `face cx=${(metrics.bboxCenterX*100).toFixed(0)}% eyeY=${(metrics.eyeYRel*100).toFixed(0)}% headH=${(metrics.bboxHeight*100).toFixed(0)}%, ` +
+    `face cx=${(metrics.bboxCenterX*100).toFixed(0)}% crownY=${((crownY_src/H)*100).toFixed(0)}% chinY=${((chinY_src/H)*100).toFixed(0)}%, ` +
     `pads L${padL.toFixed(0)} T${padT.toFixed(0)} R${padR.toFixed(0)} B${padB.toFixed(0)}`);
   return out;
 }
@@ -1672,19 +1675,16 @@ function printSheet(url) {
   const t = TYPES[gType];
   const photoW = t.wMM, photoH = t.hMM;
   let pageW, pageH, cols, rows, pageCss, padding;
+  let gap;
   if (gPaper === 'a4') {
-    pageW = 210; pageH = 297;
-    padding = 8;
+    pageW = 210; pageH = 297; padding = 6; gap = 3;
     pageCss = '@page { size: A4 portrait; margin: 0; }';
-    cols = Math.floor((pageW - 2*padding) / (photoW + 4));
-    rows = Math.floor((pageH - 2*padding) / (photoH + 4));
   } else {
-    pageW = 152; pageH = 102;  // 10×15 landscape
-    padding = 4;
+    pageW = 152; pageH = 102; padding = 2; gap = 2;  // 10×15 landscape, плотно
     pageCss = '@page { size: 152mm 102mm; margin: 0; }';
-    cols = Math.floor((pageW - 2*padding) / (photoW + 3));
-    rows = Math.floor((pageH - 2*padding) / (photoH + 3));
   }
+  cols = Math.floor((pageW - 2*padding + gap) / (photoW + gap));
+  rows = Math.floor((pageH - 2*padding + gap) / (photoH + gap));
   const maxTotal = cols * rows;
   // Пользователь может выбрать меньше копий чем влезает — рисуем cols×rows ячеек,
   // но первые N с фото, остальные пустые (или просто рендерим только N подряд).
@@ -1722,7 +1722,7 @@ function printSheet(url) {
   body{padding:${padding}mm;display:grid;
        grid-template-columns:repeat(${cols},${photoW}mm);
        grid-template-rows:repeat(${rows},${photoH}mm);
-       gap:3mm;align-content:start;justify-content:center}
+       gap:${gap}mm;align-content:start;justify-content:center}
   .cell{position:relative;width:${photoW}mm;height:${photoH}mm}
   .cell img{width:${photoW}mm;height:${photoH}mm;display:block;image-rendering:-webkit-optimize-contrast}
   .m{position:absolute;background:#888}
@@ -1916,16 +1916,22 @@ async function measureFaceMetrics(dataUrl) {
       const n2m = mouth.y - nose.y;
       const yaw = (nose.x - (re.x + le.x)/2) / bb.width;
       const roll = Math.atan2(le.y-re.y, le.x-re.x) * 180/Math.PI;
-      // Доп. метрики для ГОСТ-чека: высота bbox как доля кадра (~доля головы),
-      // и линия глаз от низа кадра (1 - eyeMidY).
-      // bbox не покрывает темя (волосы), поэтому headPct ≈ bb.height * 1.18 эмпирически.
-      const bboxHeight = Math.min(1, bb.height * 1.18);
-      const eyeFromBottom = 1 - eyeMidY;
+      // MediaPipe bbox покрывает примерно от бровей до подбородка (без волос).
+      // Реальный «верх головы» (включая волосы) выше bbox top на ~30% от bb.height.
+      // Реальный «низ головы» — это bbox bottom (подбородок).
+      const HAIR_RATIO = 0.30;
+      const crownYRel = Math.max(0, bb.yCenter - bb.height/2 - HAIR_RATIO * bb.height);
+      const chinYRel  = Math.min(1, bb.yCenter + bb.height/2);
+      const headHeightRel = chinYRel - crownYRel;
       // Координаты центра лица для smart-reframe
       const bboxCenterX = bb.xCenter;
       const bboxCenterY = bb.yCenter;
       const eyeYRel = eyeMidY;  // 0..1 от верха кадра
-      settle({ iod, e2c, n2m, yaw, roll, faceCount, bboxHeight, eyeFromBottom, bboxCenterX, bboxCenterY, eyeYRel });
+      const eyeFromBottom = 1 - eyeMidY;
+      // bboxHeight оставляем для обратной совместимости (используется в ГОСТ-чеке)
+      const bboxHeight = headHeightRel;
+      settle({ iod, e2c, n2m, yaw, roll, faceCount, bboxHeight, eyeFromBottom,
+               bboxCenterX, bboxCenterY, eyeYRel, crownYRel, chinYRel, headHeightRel });
     };
     try { window._fd.onResults(once); } catch (e) { return settle(null); }
     const timeout = setTimeout(() => settle(null), 3000);
