@@ -1143,40 +1143,53 @@ async function doCapture() {
   }
 
   // Сохраняем raw-источник ДО finalizeCapturedCanvas (тот сожмёт до 413×531).
-  // Это та картинка, которую увидит Gemini в aiCleanBg.
+  // Это та картинка, которую увидит Gemini в aiCleanBg, и на ней же
+  // мы теперь считаем метрики и делаем smart-reframe — для максимальной точности.
   gLastRawSourceUrl = capCv.toDataURL('image/jpeg', 0.95);
   Log.info(`doCapture raw: ${cW}x${cH} (video=${vw}x${vh})`);
 
   po.step('Постобработка');
-  po.substep('масштабируем до 300 DPI, мягкая коррекция света');
-  po.progress(0.4);
-  // Flood-fill отключён по умолчанию — даёт артефакты на сложном фоне.
-  // Для удаления фона/ретуши пользователь нажимает «🪄 AI обработка» в preview.
-  let url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
-  po.progress(0.7);
+  po.substep('считаем геометрию лица на raw');
+  po.progress(0.35);
 
-  // Smart-reframe: одиночный capture тоже приводим к ГОСТ-фреймингу
-  // (голова 75%, глаза 63%, центр X). Делаем после finalize, чтобы работать
-  // с уже корректно DPI/JFIF-патченной картинкой.
+  // Smart-reframe идёт на RAW (а не на ужатой 413×531). Это:
+  //   1) даёт MediaPipe больше пикселей → точнее crownY/chinY/eye landmarks
+  //   2) убирает лишний resample — раньше было два прохода finalizeCapturedCanvas
+  //      (раз до reframe, чтобы прогнать через measureFaceMetrics, и раз после).
+  let reframedCv = null;
   try {
-    po.substep('подгоняем под ГОСТ');
-    const m = await measureFaceMetrics(url);
+    const m = await measureFaceMetrics(gLastRawSourceUrl);
     if (m) {
-      const reframed = await smartReframe(url, m, TYPES[gType]);
-      // Прогоняем reframe-канвас через finalizeCapturedCanvas чтобы
-      // получить выход 300 DPI с правильным DPI-патчем
-      capCv.width = reframed.width; capCv.height = reframed.height;
-      capCtx.drawImage(reframed, 0, 0);
-      url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
-      Log.info('Single capture: smart-reframed to GOST');
+      po.substep('подгоняем под ГОСТ');
+      reframedCv = await smartReframe(gLastRawSourceUrl, m, TYPES[gType]);
+      Log.info(`doCapture reframe: ${reframedCv.width}x${reframedCv.height}`);
     } else {
-      Log.warn('Single capture: face not found, keeping non-reframed output');
+      Log.warn('doCapture: face not found on raw, keeping aspect-crop only');
     }
   } catch (e) {
-    Log.warn('Single capture smart-reframe failed, keeping non-reframed:', e.message);
+    Log.warn('doCapture smart-reframe on raw failed, keeping aspect-crop only:', e.message);
   }
+  po.progress(0.7);
+
+  // Если reframe удался — кладём результат в capCv; иначе оставляем raw cropped.
+  // В обоих случаях далее ровно один finalizeCapturedCanvas → 413×531 / 300 DPI / JFIF.
+  if (reframedCv) {
+    capCv.width = reframedCv.width; capCv.height = reframedCv.height;
+    capCtx.drawImage(reframedCv, 0, 0);
+  }
+
+  po.substep('масштаб до 300 DPI, JFIF');
+  // Flood-fill отключён по умолчанию — даёт артефакты на сложном фоне.
+  // Для удаления фона/ретуши пользователь нажимает «🪄 AI обработка» в preview.
+  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
   po.progress(1);
   po.remove();
+
+  const _t = TYPES[gType];
+  const _tw = Math.round(_t.wMM * TARGET_DPI / 25.4);
+  const _th = Math.round(_t.hMM * TARGET_DPI / 25.4);
+  Log.info(`non-AI doCapture trace: raw=${cW}x${cH} → reframe=${reframedCv ? reframedCv.width+'x'+reframedCv.height : '(skipped)'} → finalized=${_tw}x${_th}`);
+
   Backup.saveFinal(url, { kind:'single-camera', type: gType });
   Log.info('Single capture done, type=', gType);
   showPreview(url, { kind:'single' });
@@ -1833,17 +1846,48 @@ async function ingestSingleFile(file) {
     capCv.width = cW; capCv.height = cH;
     capCtx.drawImage(img, sx, sy, cW, cH, 0, 0, cW, cH);
 
-    // Raw для AI: исходник, кропнутый под аспект 35:45, без ресайза до 413×531.
-    // Для 4K-файла это, например, 3024×3888 → AI получает полную детализацию.
+    // Raw для AI и для собственного reframe: исходник, кропнутый под аспект 35:45,
+    // без ресайза до 413×531. Для 4K-файла это, например, 3024×3888.
     gLastRawSourceUrl = capCv.toDataURL('image/jpeg', 0.95);
     Log.info(`ingestSingleFile raw: ${cW}x${cH} (source=${sw}x${sh})`);
 
     po.step('Постобработка');
-    po.substep('масштаб до 300 DPI, свет');
-    po.progress(0.7);
+    po.substep('считаем геометрию лица на raw');
+    po.progress(0.55);
+
+    // Smart-reframe (раньше в ingestSingleFile его не было — просто аспект-кроп шёл
+    // прямо в finalize). Теперь приводим загруженное фото к тому же ГОСТ-фреймингу,
+    // что и кадр с камеры. Метрики считаем на raw — точнее и без лишнего resample.
+    let reframedCv = null;
+    try {
+      const m = await measureFaceMetrics(gLastRawSourceUrl);
+      if (m) {
+        po.substep('подгоняем под ГОСТ');
+        reframedCv = await smartReframe(gLastRawSourceUrl, m, TYPES[gType]);
+        Log.info(`ingestSingleFile reframe: ${reframedCv.width}x${reframedCv.height}`);
+      } else {
+        Log.warn('ingestSingleFile: face not found on raw, keeping aspect-crop only');
+      }
+    } catch (e) {
+      Log.warn('ingestSingleFile smart-reframe on raw failed, keeping aspect-crop only:', e.message);
+    }
+    po.progress(0.85);
+
+    if (reframedCv) {
+      capCv.width = reframedCv.width; capCv.height = reframedCv.height;
+      capCtx.drawImage(reframedCv, 0, 0);
+    }
+
+    po.substep('масштаб до 300 DPI');
     const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
     po.progress(1);
     po.remove();
+
+    const _t = TYPES[gType];
+    const _tw = Math.round(_t.wMM * TARGET_DPI / 25.4);
+    const _th = Math.round(_t.hMM * TARGET_DPI / 25.4);
+    Log.info(`non-AI ingestSingleFile trace: raw=${cW}x${cH} → reframe=${reframedCv ? reframedCv.width+'x'+reframedCv.height : '(skipped)'} → finalized=${_tw}x${_th}`);
+
     Backup.saveFinal(url, { kind:'single-upload', type: gType, name: file.name });
     showPreview(url, { kind:'single' });
   } catch (e) {
