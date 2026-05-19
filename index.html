@@ -1117,10 +1117,32 @@ async function doCapture() {
 
   po.step('Постобработка');
   po.substep('масштабируем до 300 DPI, мягкая коррекция света');
-  po.progress(0.5);
-  // Flood-fill отключён по умолчанию — даёт артефакты на сложном фоне (машина, комната).
-  // Для удаления фона пользователь нажимает «🪄 AI фон» в preview (Gemini) или 🪄 ImgLy.
-  const url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
+  po.progress(0.4);
+  // Flood-fill отключён по умолчанию — даёт артефакты на сложном фоне.
+  // Для удаления фона пользователь нажимает «🪄 AI фон» в preview.
+  let url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
+  po.progress(0.7);
+
+  // Smart-reframe: одиночный capture тоже приводим к ГОСТ-фреймингу
+  // (голова 75%, глаза 63%, центр X). Делаем после finalize, чтобы работать
+  // с уже корректно DPI/JFIF-патченной картинкой.
+  try {
+    po.substep('подгоняем под ГОСТ');
+    const m = await measureFaceMetrics(url);
+    if (m) {
+      const reframed = await smartReframe(url, m, TYPES[gType]);
+      // Прогоняем reframe-канвас через finalizeCapturedCanvas чтобы
+      // получить выход 300 DPI с правильным DPI-патчем
+      capCv.width = reframed.width; capCv.height = reframed.height;
+      capCtx.drawImage(reframed, 0, 0);
+      url = await finalizeCapturedCanvas(capCv, { skipBgFill: true });
+      Log.info('Single capture: smart-reframed to GOST');
+    } else {
+      Log.warn('Single capture: face not found, keeping non-reframed output');
+    }
+  } catch (e) {
+    Log.warn('Single capture smart-reframe failed, keeping non-reframed:', e.message);
+  }
   po.progress(1);
   po.remove();
   Backup.saveFinal(url, { kind:'single-camera', type: gType });
@@ -1367,30 +1389,30 @@ async function aiCleanBg() {
   const refMetrics = preMetrics;
   Log.info('aiCleanBg ref:', refMetrics);
 
-  // Pre-crop: до отправки в Gemini обрезаем исходник под 35:45 и нужный фрейминг.
-  // Это убирает посторонние элементы (UI скриншотов, окружение) — модель меньше
-  // отвлекается и реже отказывается ошибкой IMAGE_OTHER. Плюс ужимаем до 1024 px
-  // на длинной стороне, чтобы уменьшить токены и время ответа.
+  // Перед отправкой в Gemini ужимаем картинку до 1024 px на длинной стороне.
+  // НЕ обрезаем — AI нужен контекст вокруг лица для понимания фона и пропорций.
+  // Slim resize: меньше токенов и времени, но AI видит окружение.
   let sourceForAi = source;
   try {
-    po.substep('обрезаем исходник под 35:45');
-    const preCv = await smartReframe(source, refMetrics, TYPES[gType]);
+    po.substep('готовим картинку для AI');
+    const srcImg = await loadImage(source);
     const MAX_DIM = 1024;
-    const longest = Math.max(preCv.width, preCv.height);
-    let sendCv = preCv;
+    const longest = Math.max(srcImg.width, srcImg.height);
     if (longest > MAX_DIM) {
       const scale = MAX_DIM / longest;
-      sendCv = document.createElement('canvas');
-      sendCv.width  = Math.round(preCv.width * scale);
-      sendCv.height = Math.round(preCv.height * scale);
+      const sendCv = document.createElement('canvas');
+      sendCv.width  = Math.round(srcImg.width * scale);
+      sendCv.height = Math.round(srcImg.height * scale);
       const ox = sendCv.getContext('2d');
       ox.imageSmoothingEnabled = true; ox.imageSmoothingQuality = 'high';
-      ox.drawImage(preCv, 0, 0, sendCv.width, sendCv.height);
+      ox.drawImage(srcImg, 0, 0, sendCv.width, sendCv.height);
+      sourceForAi = sendCv.toDataURL('image/jpeg', 0.92);
+      Log.info(`aiCleanBg resize: ${srcImg.width}x${srcImg.height} → ${sendCv.width}x${sendCv.height}`);
+    } else {
+      Log.info(`aiCleanBg: source ${srcImg.width}x${srcImg.height} fits MAX_DIM, no resize`);
     }
-    sourceForAi = sendCv.toDataURL('image/jpeg', 0.92);
-    Log.info(`aiCleanBg pre-crop: ${preCv.width}x${preCv.height} → send ${sendCv.width}x${sendCv.height}`);
   } catch (e) {
-    Log.warn('aiCleanBg pre-crop failed, sending raw source:', e.message);
+    Log.warn('aiCleanBg resize failed, sending raw source:', e.message);
   }
 
   po.step('2/4: Gemini заменяет фон');
@@ -1425,9 +1447,10 @@ async function aiCleanBg() {
     po.substep(`лицо: макс отклонение ${(maxDevPct*100).toFixed(1)}% (${maxDevK})`);
   }
   // Жёсткий лимит — выше этого AI уже подменил человека.
-  // Мягкий лимит — ретушь/закрытие рта/выравнивание плеч могут естественно сдвинуть метрики.
-  const HARD_FACE_LIMIT = 0.12;  // 12%
-  const SOFT_FACE_LIMIT = 0.05;  // 5%
+  // Мягкий лимит — ретушь/закрытие рта/выравнивание плеч могут естественно
+  // сдвинуть метрики на 10-15% (особенно n2m при закрытии открытого рта).
+  const HARD_FACE_LIMIT = 0.18;  // 18% — оставляем только явные подмены лица
+  const SOFT_FACE_LIMIT = 0.05;  // 5% — выше = есть ретушь, но это не подмена
   const personHardFail = maxDevPct > HARD_FACE_LIMIT || !aiMetrics;
   const personSoftWarn = !personHardFail && maxDevPct > SOFT_FACE_LIMIT;
   po.progress(0.8);
@@ -1613,8 +1636,8 @@ async function checkBackgroundWhite(dataUrl) {
   const meanL = samples.reduce((a,b)=>a+b,0) / samples.length;
   const varL = samples.reduce((a,b)=>a + (b-meanL)*(b-meanL), 0) / samples.length;
   const stdL = Math.sqrt(varL);
-  if (meanL < 200) return { ok:false, meanL, stdL, reason:`верх фона тёмный, средняя яркость ${meanL.toFixed(0)}/255 (нужно ≥ 200)` };
-  if (stdL > 35)   return { ok:false, meanL, stdL, reason:`верх фона неоднородный, σ=${stdL.toFixed(0)} (нужно ≤ 35)` };
+  if (meanL < 190) return { ok:false, meanL, stdL, reason:`верх фона тёмный, средняя яркость ${meanL.toFixed(0)}/255 (нужно ≥ 190)` };
+  if (stdL > 50)   return { ok:false, meanL, stdL, reason:`верх фона неоднородный, σ=${stdL.toFixed(0)} (нужно ≤ 50)` };
   return { ok:true, meanL, stdL };
 }
 
