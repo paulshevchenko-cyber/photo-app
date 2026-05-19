@@ -135,6 +135,16 @@
   #b-stop  { top: 56px; left: 56px; font-size: 24px;
              background: #ffebee; border-color: rgba(192,57,43,0.5); }
   .btn.stop.held { background: #c0392b !important; color: white !important; }
+  #police-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    border-color: rgba(33,150,243,0.7);
+    background: rgba(227,242,253,0.95);
+    font-size: 28px;
+  }
+  #police-btn.cooldown { opacity: 0.45; }
 
   #side-buttons {
     display: flex;
@@ -305,6 +315,7 @@
       <button class="btn" id="b-right">▶</button>
       <button class="btn" id="b-down">▼</button>
     </div>
+    <button class="side-btn" id="police-btn" title="Вызвать полицию">🚓</button>
   </div>
 
   <div id="toast"></div>
@@ -818,6 +829,7 @@
     let best = null, bestGap = Infinity;
     for (const other of [player].concat(aiCars)) {
       if (other === car || !other) continue;
+      if (other._towing) continue;
       const dx = other.x - car.x, dy = other.y - car.y;
       // project on dir
       const along = dx * d.dx + dy * d.dy;
@@ -1135,17 +1147,18 @@
 
   function drawCar(car, t) {
     if (car.isPlayer) {
-      // glow under player
+      // glow under player — warm orange so yellow taxi body still stands out
       const pulse = 0.5 + Math.sin(t / 220) * 0.5;
       const grad = ctx.createRadialGradient(car.x, car.y, 10, car.x, car.y, 24);
-      grad.addColorStop(0, `rgba(255, 215, 0, ${0.4 + pulse * 0.2})`);
-      grad.addColorStop(1, 'rgba(255, 215, 0, 0)');
+      grad.addColorStop(0, `rgba(255, 152, 0, ${0.4 + pulse * 0.2})`);
+      grad.addColorStop(1, 'rgba(255, 152, 0, 0)');
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(car.x, car.y, 24, 0, Math.PI * 2);
       ctx.fill();
     }
 
+    if (car._towing) ctx.globalAlpha = 0.45;
     ctx.save();
     ctx.translate(car.x, car.y);
     ctx.rotate(car.visualAng + Math.PI / 2);
@@ -1170,16 +1183,17 @@
     ctx.fillRect(-w / 2 + 1, h / 2 - 3, 3, 2);
     ctx.fillRect(w / 2 - 4, h / 2 - 3, 3, 2);
 
-    // Player: taxi sign on roof
+    // Player: taxi sign on roof — black plaque with yellow letters for
+    // contrast against the yellow body.
     if (car.isPlayer) {
-      ctx.fillStyle = '#fdd835';
-      roundRect(-5, -3, 10, 5, 1); ctx.fill();
       ctx.fillStyle = '#000';
+      roundRect(-5, -3, 10, 5, 1); ctx.fill();
+      ctx.fillStyle = '#fdd835';
       ctx.font = 'bold 4px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText('TAXI', 0, 0);
-      // checkered stripe
+      // checkered stripe — black squares on the yellow body
       ctx.fillStyle = '#000';
       for (let i = 0; i < 3; i++) {
         ctx.fillRect(-5 + i * 4, h / 2 - 6, 2, 2);
@@ -1195,6 +1209,7 @@
       }
     }
     ctx.restore();
+    if (car._towing) ctx.globalAlpha = 1;
   }
 
   // ===================== INTERACTIONS =====================
@@ -1251,6 +1266,7 @@
 
   function checkCollisions() {
     for (const ai of aiCars) {
+      if (ai._towing) continue;
       const dx = ai.x - player.x;
       const dy = ai.y - player.y;
       if (dx * dx + dy * dy < 17 * 17) {
@@ -1548,9 +1564,12 @@
   // ===================== SPAWN AI =====================
   function spawnAICars(count) {
     aiCars = [];
+    refillAI(count);
+  }
+  function refillAI(target) {
     const colors = ['#3498db', '#9b59b6', '#1abc9c', '#f39c12', '#2c3e50', '#16a085', '#8e44ad', '#34495e'];
     let tries = 0;
-    while (aiCars.length < count && tries < 400) {
+    while (aiCars.length < target && tries < 400) {
       tries++;
       const r = Math.floor(Math.random() * ROWS);
       const c = Math.floor(Math.random() * COLS);
@@ -1593,8 +1612,8 @@
     goal = 30 + (level - 1) * 25;
     document.getElementById('goal').textContent = goal;
     // Player starts in southwest road, going east (on bottom-right lane of horiz road row 23)
-    // Car begins parked — kids press ▲ to start moving.
-    player = makeCar(23, 4, 'E', '#e53935', true);
+    // Car begins parked — kids press ▲ to start moving. Bright taxi yellow.
+    player = makeCar(23, 4, 'E', '#fdd835', true);
     player.braking = true;
     syncBrakeBtn();
     spawnAICars(Math.min(4 + level, 10));
@@ -1760,10 +1779,68 @@
     else turnTo(dy < 0 ? 'N' : 'S');
   });
 
-  // Pause / Nav / Speed buttons
+  // Pause / Nav / Speed / Police buttons
   document.getElementById('pause-btn').addEventListener('click', togglePause);
   document.getElementById('nav-btn').addEventListener('click', toggleNav);
   document.getElementById('speed-btn').addEventListener('click', cycleSpeed);
+  document.getElementById('police-btn').addEventListener('click', summonPolice);
+
+  // ===================== POLICE =====================
+  // When AI cars pile up on an intersection and stop moving, the kid can
+  // tap 🚓 — tow trucks haul the stuck cars off the map and fresh AI
+  // replaces them. Cooldown prevents button spam.
+  let policeLast = -100000;
+  const POLICE_COOLDOWN = 12000;
+  function summonPolice() {
+    if (!running || paused) return;
+    const dt = gameTime - policeLast;
+    if (dt < POLICE_COOLDOWN) {
+      const left = Math.ceil((POLICE_COOLDOWN - dt) / 1000);
+      showToast('🚓 Полиция занята — ещё ' + left + ' сек', '', 1500);
+      return;
+    }
+    // A car counts as "stuck" if it's moving slowly AND has at least one
+    // close neighbor — that's how an intersection pile-up looks.
+    const stuck = [];
+    for (const ai of aiCars) {
+      if (ai._towing || ai.speed >= 1.0) continue;
+      for (const other of aiCars) {
+        if (other === ai || other._towing) continue;
+        const dx = other.x - ai.x, dy = other.y - ai.y;
+        if (dx * dx + dy * dy < 50 * 50) { stuck.push(ai); break; }
+      }
+    }
+    if (stuck.length === 0) {
+      showToast('🚓 Все едут нормально', 'good', 1500);
+      return;
+    }
+    policeLast = gameTime;
+    showToast('🚓 Полиция и эвакуатор едут — расчищаем дорогу!', 'good', 2500);
+    beep(900, 0.18, 'square', 0.07);
+    setTimeout(() => beep(650, 0.18, 'square', 0.07), 200);
+    setTimeout(() => beep(900, 0.18, 'square', 0.07), 400);
+    setTimeout(() => beep(650, 0.18, 'square', 0.07), 600);
+    // Tow each stuck car off the nearest map edge.
+    for (const ai of stuck) {
+      ai._towing = true;
+      ai.speed = 0;
+      ai.dir = null;
+      const dx = ai.x < W / 2 ? -1 : 1;
+      const dy = ai.y < H / 2 ? -1 : 1;
+      ai._towVx = dx * 1.8;
+      ai._towVy = dy * 1.0;
+    }
+    const btn = document.getElementById('police-btn');
+    btn.classList.add('cooldown');
+    setTimeout(() => {
+      // Remove the towed cars and refill from the level's target count
+      const wasTowing = aiCars.filter(c => c._towing).length;
+      aiCars = aiCars.filter(c => !c._towing);
+      refillAI(Math.min(4 + level, 10));
+      if (wasTowing > 0) showToast('🚦 Перекрёсток расчищен!', 'good', 1700);
+    }, 1800);
+    setTimeout(() => btn.classList.remove('cooldown'), POLICE_COOLDOWN);
+  }
 
   function cycleSpeed() {
     const idx = SPEED_LEVELS.indexOf(speedMul);
@@ -1916,7 +1993,10 @@
     gameTime += dt;
 
     updateCar(player, dt);
-    for (const ai of aiCars) updateCar(ai, dt);
+    for (const ai of aiCars) {
+      if (ai._towing) { ai.x += ai._towVx; ai.y += ai._towVy; continue; }
+      updateCar(ai, dt);
+    }
 
     checkPassenger();
     checkSigns();
@@ -1962,6 +2042,7 @@
       '<b>Машина стоит. Нажми стрелку чтобы поехать.</b><br>' +
       '▲ вверх &nbsp; ▼ вниз &nbsp; ◀ влево &nbsp; ▶ вправо<br>' +
       '🛑 в центре — полная остановка<br>' +
+      '🚓 справа — позвать полицию, если перекрёсток засорился<br>' +
       '⏸ пауза &nbsp; 🔊 навигатор &nbsp; 🐢 скорость &nbsp; 📱 наклон<br><br>' +
       'Знаки 🛑🔻🔄🚶 объясняются, когда увидишь их в первый раз.<br>' +
       '<b>Цель:</b> набрать <span style="color:#f39c12">' + goal + ' ⭐</span><br>' +
